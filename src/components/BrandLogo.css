@@ -1,0 +1,25 @@
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.brand-logo__mark {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+}
+
+.brand-logo__name {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+}
+
+.brand-logo__accent {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

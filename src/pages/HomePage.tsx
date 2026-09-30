@@ -1,30 +1,88 @@
-import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { motion, type Variants } from 'framer-motion';
+import { ArrowRight, Shirt, Sparkles } from 'lucide-react';
+import { BrandLogo } from '../components/BrandLogo';
+import { Button } from '../components/Button';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { APP_NAME, APP_TAGLINE, pageTitle } from '../utils/constants';
+import { WELCOME_NEXT_PATH } from '../routes/paths';
+import { APP_DESCRIPTION, pageTitle } from '../utils/constants';
 import './HomePage.css';
 
-/**
- * Temporary placeholder for "/". It only confirms that the application runs;
- * the real Welcome page is built in a later step.
- */
+const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const container: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.1 } },
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE_OUT } },
+};
+
+const START_UNAVAILABLE_NOTE_ID = 'start-unavailable-note';
+
+/** Welcome page: brand introduction and entry point into the SizerAI flow. */
 export function HomePage() {
   useDocumentTitle(pageTitle());
 
   return (
-    <section className="home-page" aria-labelledby="home-title">
-      <motion.div
-        className="home-page__content"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <Sparkles className="home-page__icon" aria-hidden="true" size={28} strokeWidth={1.75} />
-        <h1 id="home-title" className="home-page__title">
-          {APP_NAME}
-        </h1>
-        <p className="home-page__tagline">{APP_TAGLINE}</p>
+    <div className="welcome">
+      <motion.div className="welcome__brand" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+        <BrandLogo />
       </motion.div>
-    </section>
+
+      <section className="welcome__hero" aria-labelledby="welcome-title">
+        <motion.div className="welcome__copy" variants={container} initial="hidden" animate="visible">
+          <motion.p className="welcome__eyebrow" variants={item}>
+            <Sparkles aria-hidden="true" size={16} strokeWidth={2} />
+            AI-powered size guidance
+          </motion.p>
+
+          <motion.h1 id="welcome-title" className="welcome__title" variants={item}>
+            Perfect Fit.
+            <span className="welcome__title-accent"> Powered by AI.</span>
+          </motion.h1>
+
+          <motion.p className="welcome__description" variants={item}>
+            {APP_DESCRIPTION}
+          </motion.p>
+
+          <motion.div className="welcome__actions" variants={item}>
+            {WELCOME_NEXT_PATH ? (
+              <Button to={WELCOME_NEXT_PATH} size="lg">
+                Get Started
+                <ArrowRight aria-hidden="true" size={20} />
+              </Button>
+            ) : (
+              <>
+                <Button size="lg" aria-disabled="true" aria-describedby={START_UNAVAILABLE_NOTE_ID}>
+                  Get Started
+                  <ArrowRight aria-hidden="true" size={20} />
+                </Button>
+                <p id={START_UNAVAILABLE_NOTE_ID} className="welcome__note">
+                  The next step is coming soon.
+                </p>
+              </>
+            )}
+          </motion.div>
+        </motion.div>
+
+        <motion.div
+          className="welcome__visual"
+          aria-hidden="true"
+          initial={{ opacity: 0, scale: 0.94 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.9, ease: EASE_OUT, delay: 0.2 }}
+        >
+          <div className="welcome__orb welcome__orb--primary" />
+          <div className="welcome__orb welcome__orb--secondary" />
+          <div className="welcome__ring welcome__ring--outer" />
+          <div className="welcome__ring welcome__ring--inner" />
+          <div className="welcome__glass">
+            <Shirt size={56} strokeWidth={1.25} />
+          </div>
+        </motion.div>
+      </section>
+    </div>
   );
 }
