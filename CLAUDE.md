@@ -34,13 +34,28 @@ current step explicitly asks for it.**
 
 ## 2. Current Repository State
 
-As of the creation of this file, the repository contains only:
+Step 1 (application foundation) is complete. The project is a Vite + React +
+TypeScript app with a single placeholder route (`/`). No product features exist yet.
 
-- `.gitattributes` (LF normalization)
-- `CLAUDE.md` (this file)
+Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm run preview`.
 
-No application code, `package.json`, build tooling or dependencies exist yet.
-The project will be scaffolded in a later, explicitly requested step.
+```
+src/
+  main.tsx            entry point (imports global CSS, mounts <App />)
+  App.tsx             MotionConfig + RouterProvider
+  assets/             static assets imported by code
+  components/         reusable UI components (SkipLink)
+  layouts/            route layouts (RootLayout: skip link + <main> + <Outlet />)
+  pages/              route pages (HomePage: temporary placeholder)
+  routes/router.tsx   route definitions (createBrowserRouter)
+  store/              Zustand store (useAppStore) composed from slices/
+                      (user, fit, settings); only units/theme are persisted
+  hooks/              reusable hooks (useDocumentTitle)
+  services/           side-effect/IO modules (safe localStorage wrapper)
+  utils/              pure helpers and constants
+  types/domain.ts     domain types (lengths in cm, weight in kg)
+  styles/             tokens.css (design tokens) + global.css (reset/base)
+```
 
 > Keep this section accurate when the project structure changes significantly.
 
