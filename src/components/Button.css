@@ -1,0 +1,81 @@
+.button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    opacity var(--transition-base);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-full);
+}
+
+/* Sizes (min 44px tall for touch targets) */
+.button--md {
+  min-height: 2.75rem;
+  padding: 0 var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.button--lg {
+  min-height: 3.5rem;
+  padding: 0 var(--space-8);
+  font-size: var(--text-base);
+}
+
+/* Primary */
+.button--primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-tertiary) 100%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.18) inset,
+    0 10px 30px -10px rgb(139 92 246 / 0.65);
+}
+
+.button--primary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.22) inset,
+    0 14px 36px -10px rgb(139 92 246 / 0.8);
+}
+
+.button--primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary */
+.button--secondary {
+  color: var(--color-text);
+  background: var(--color-surface-glass);
+  border-color: var(--color-border-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.button--secondary:hover {
+  border-color: rgb(148 163 214 / 0.45);
+  background: var(--color-surface-raised);
+}
+
+/* Unavailable: stays focusable (aria-disabled) so assistive tech can announce why */
+.button[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}

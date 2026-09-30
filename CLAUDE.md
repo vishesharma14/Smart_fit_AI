@@ -34,8 +34,10 @@ current step explicitly asks for it.**
 
 ## 2. Current Repository State
 
-Step 1 (application foundation) is complete. The project is a Vite + React +
-TypeScript app with a single placeholder route (`/`). No product features exist yet.
+Step 1 (application foundation) and Step 2 (Welcome page) are complete. The project
+is a Vite + React + TypeScript app with a single route (`/`, the Welcome page). The
+Welcome page's Start button stays unavailable until `WELCOME_NEXT_PATH` in
+`src/routes/paths.ts` points to a real route.
 
 Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm run preview`.
 
@@ -44,10 +46,11 @@ src/
   main.tsx            entry point (imports global CSS, mounts <App />)
   App.tsx             MotionConfig + RouterProvider
   assets/             static assets imported by code
-  components/         reusable UI components (SkipLink)
+  components/         reusable UI components (SkipLink, Button, BrandLogo)
   layouts/            route layouts (RootLayout: skip link + <main> + <Outlet />)
-  pages/              route pages (HomePage: temporary placeholder)
+  pages/              route pages (HomePage: Welcome page)
   routes/router.tsx   route definitions (createBrowserRouter)
+  routes/paths.ts     central path constants + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
                       (user, fit, settings); only units/theme are persisted
   hooks/              reusable hooks (useDocumentTitle)
