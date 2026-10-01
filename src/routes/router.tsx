@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router';
 import { RootLayout } from '../layouts/RootLayout';
+import { BodyScanPage } from '../pages/BodyScanPage';
 import { ClothingSelectionPage } from '../pages/ClothingSelectionPage';
 import { HomePage } from '../pages/HomePage';
 import { UserInfoPage } from '../pages/UserInfoPage';
@@ -13,6 +14,7 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: PATHS.userInfo, element: <UserInfoPage /> },
       { path: PATHS.clothing, element: <ClothingSelectionPage /> },
+      { path: PATHS.scan, element: <BodyScanPage /> },
     ],
   },
 ]);

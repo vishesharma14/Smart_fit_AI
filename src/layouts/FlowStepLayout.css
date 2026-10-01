@@ -1,0 +1,105 @@
+.flow-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-block: var(--space-6) var(--space-12);
+}
+
+.flow-step__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.flow-step__layout {
+  display: grid;
+  gap: var(--space-8);
+  width: 100%;
+  max-width: 40rem;
+  margin-inline: auto;
+  padding-top: var(--space-10);
+}
+
+/* Intro */
+.flow-step__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.flow-step__title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.flow-step__title-accent {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.flow-step__lead {
+  max-width: 34rem;
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+}
+
+/* Form */
+.flow-step__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* Actions */
+.flow-step__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.flow-step__continue {
+  flex: 1;
+}
+
+/* Tablet */
+@media (min-width: 48rem) {
+  .flow-step__layout {
+    padding-top: var(--space-12);
+  }
+
+  .flow-step__actions {
+    justify-content: space-between;
+  }
+
+  .flow-step__continue {
+    flex: 0 0 auto;
+    min-width: 12rem;
+  }
+}
+
+/* Desktop: intro beside the form */
+@media (min-width: 64rem) {
+  .flow-step {
+    padding-block: var(--space-8) var(--space-16);
+  }
+
+  .flow-step__layout {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    align-items: start;
+    gap: var(--space-16);
+    max-width: none;
+    padding-top: var(--space-16);
+  }
+
+  .flow-step__intro {
+    position: sticky;
+    top: var(--space-10);
+  }
+}

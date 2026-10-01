@@ -48,12 +48,25 @@ export interface BodyMeasurements {
   recordedAt: string;
 }
 
-/** Identifier of a clothing category. The category list is defined in a later step. */
-export type ClothingCategoryId = string;
+/** Group a clothing type belongs to. */
+export type ClothingCategory = 'tops' | 'bottoms' | 'formalwear';
+
+/** Clothing item the user wants a size recommendation for. */
+export type ClothingType = 't-shirt' | 'shirt' | 'jeans' | 'trousers' | 'blazer';
+
+/** How closely the user prefers the garment to fit. Affects style, not measurements. */
+export type FitPreference = 'slim' | 'regular' | 'relaxed';
+
+/** What the user chose on the Clothing Selection step. */
+export interface ClothingSelection {
+  type: ClothingType;
+  /** `null` only for clothing types where fit preference does not apply. */
+  fit: FitPreference | null;
+}
 
 /** A size recommendation produced by the (future) prediction service. */
 export interface SizePrediction {
-  categoryId: ClothingCategoryId;
+  clothingType: ClothingType;
   size: string;
   /** Model confidence in the range 0–1, as reported by the prediction service. */
   confidence: number;

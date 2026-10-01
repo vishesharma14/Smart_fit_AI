@@ -18,6 +18,8 @@ interface FormFieldProps {
   error?: string;
   /** Render as <fieldset>/<legend> when the field contains several controls (radio cards, ft + in). */
   group?: boolean;
+  /** Visually hide the label (it stays available to screen readers), e.g. when a card title already names the field. */
+  hideLabel?: boolean;
   /** Extra control shown next to the label, e.g. a unit switch. */
   labelAction?: ReactNode;
   /** Explicit id for the primary control; generated when omitted. */
@@ -26,7 +28,17 @@ interface FormFieldProps {
 }
 
 /** Label, hint and accessible error message around one form control or control group. */
-export function FormField({ label, optional, hint, error, group, labelAction, controlId, children }: FormFieldProps) {
+export function FormField({
+  label,
+  optional,
+  hint,
+  error,
+  group,
+  hideLabel,
+  labelAction,
+  controlId,
+  children,
+}: FormFieldProps) {
   const generatedId = useId();
   const id = controlId ?? `${generatedId}-control`;
   const hintId = hint ? `${id}-hint` : undefined;
@@ -46,7 +58,7 @@ export function FormField({ label, optional, hint, error, group, labelAction, co
     <Wrapper className={['form-field', error ? 'form-field--invalid' : ''].filter(Boolean).join(' ')}>
       {/* A <legend> must be the fieldset's first child; the visible label below is decorative for groups. */}
       {group && <legend className="visually-hidden">{label}{optional ? ' (optional)' : ''}</legend>}
-      <div className="form-field__header">
+      <div className={['form-field__header', hideLabel ? 'visually-hidden' : ''].filter(Boolean).join(' ')}>
         {group ? (
           <span className="form-field__label" aria-hidden="true">
             {labelContent}
