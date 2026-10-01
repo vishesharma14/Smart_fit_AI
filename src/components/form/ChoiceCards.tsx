@@ -19,6 +19,12 @@ interface ChoiceCardsProps<T extends string> {
   firstId?: string;
   describedBy?: string;
   invalid?: boolean;
+  /**
+   * Radio group name. Pass the same name to several ChoiceCards to make them
+   * one group (single selection, arrow keys move across all of them).
+   */
+  name?: string;
+  className?: string;
 }
 
 /**
@@ -33,11 +39,14 @@ export function ChoiceCards<T extends string>({
   firstId,
   describedBy,
   invalid,
+  name: sharedName,
+  className,
 }: ChoiceCardsProps<T>) {
-  const name = useId();
+  const generatedName = useId();
+  const name = sharedName ?? generatedName;
 
   return (
-    <div className={['choice-cards', invalid ? 'choice-cards--invalid' : ''].filter(Boolean).join(' ')}>
+    <div className={['choice-cards', invalid ? 'choice-cards--invalid' : '', className].filter(Boolean).join(' ')}>
       {options.map((option, index) => {
         const checked = option.value === value;
         const Icon = option.icon;

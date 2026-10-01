@@ -1,19 +1,85 @@
-.placeholder-page {
-  flex: 1;
+/* Page-specific styles; the shared step frame lives in layouts/FlowStepLayout.css */
+
+/* Intro: context carried over from the details step */
+.clothing__context {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-glass);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  font-size: var(--text-sm);
+}
+
+.clothing__context-label {
+  color: var(--color-text-muted);
+}
+
+.clothing__context-value {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Clothing groups */
+.clothing__groups {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  padding-block: var(--space-16);
-  text-align: center;
+  gap: var(--space-6);
 }
 
-.placeholder-page__title {
-  font-size: var(--text-3xl);
-  font-weight: 700;
+.clothing__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
-.placeholder-page__text {
+.clothing__group-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
+}
+
+/* Fit cards are text-only, so they don't need the tall card height */
+.clothing__fits .choice-card__body {
+  min-height: 3.5rem;
+}
+
+/* Shown until an item is chosen */
+.clothing__fit-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.clothing__fit-hint svg {
+  flex-shrink: 0;
+  color: var(--color-secondary);
+}
+
+/* Wider screens: cards switch to vertical layout (see ChoiceCards.css) */
+@media (min-width: 36rem) {
+  .clothing__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clothing__cards .choice-card__body {
+    min-height: 9.5rem;
+  }
+
+  .clothing__fits--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clothing__fits .choice-card__body {
+    min-height: 7rem;
+  }
 }

@@ -34,12 +34,16 @@ current step explicitly asks for it.**
 
 ## 2. Current Repository State
 
-Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information).
+Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
+4 (Clothing Selection).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
-`/clothing` (minimal placeholder until Clothing Selection is built).
-User information is kept in memory only (not persisted); height/weight display
-units and theme are persisted.
+`/clothing` Clothing Selection (step 2 of 4) → `/scan` (minimal placeholder until
+Body Scan is built).
+User information and the clothing selection are kept in memory only (not
+persisted); height/weight display units and theme are persisted.
+Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
+Back/Continue) and `components/form/FormCard`.
 
 Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm run preview`.
 
@@ -49,17 +53,19 @@ src/
   App.tsx             MotionConfig + RouterProvider
   assets/             static assets imported by code
   components/         reusable UI components (SkipLink, Button, BrandLogo, StepProgress)
-  components/form/    form primitives (FormField, TextInput, SegmentedControl, ChoiceCards)
-  layouts/            route layouts (RootLayout: skip link + <main> + <Outlet />)
-  pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage placeholder)
+  components/form/    form primitives (FormField, FormCard, TextInput, SegmentedControl, ChoiceCards)
+  components/icons/   custom Lucide-style icons (clothing)
+  layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
+  pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage,
+                      BodyScanPage placeholder)
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
                       (user, fit, settings); only display units/theme are persisted
-  hooks/              reusable hooks (useDocumentTitle, useUserInfoForm)
+  hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm)
   services/           side-effect/IO modules (safe localStorage wrapper)
   utils/              pure helpers: constants, motion presets, unit conversion,
-                      user-info validation
+                      user-info validation, clothing catalog + validation
   types/domain.ts     domain types (lengths in cm, weight in kg)
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
