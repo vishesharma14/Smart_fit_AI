@@ -60,7 +60,8 @@ src/
   components/         reusable UI components (SkipLink, Button, BrandLogo, StepProgress)
   components/form/    form primitives (FormField, FormCard, TextInput, SegmentedControl, ChoiceCards)
   components/icons/   custom Lucide-style icons (clothing)
-  components/scan/    ScanViewport (camera + states), BodyGuideOverlay, ScanStatus, ScanPhaseProgress
+  components/scan/    ScanViewport (camera + states), BodyGuideOverlay (3D wireframe reference
+                      mannequin, procedural SVG — see mannequin/), ScanStatus, ScanPhaseProgress
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage)
   routes/router.tsx   route definitions (createBrowserRouter)

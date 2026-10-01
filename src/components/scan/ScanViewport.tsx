@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, CameraOff, LoaderCircle } from 'lucide-react';
 import type { UseCamera } from '../../hooks/useCamera';
+import type { ScanPhaseId } from '../../types/scan';
 import { CAMERA_ERROR_COPY } from '../../utils/scanGuidance';
 import { Button } from '../Button';
 import { BodyGuideOverlay } from './BodyGuideOverlay';
@@ -10,11 +11,12 @@ interface ScanViewportProps {
   camera: UseCamera;
   /** Angle label shown on the preview while scanning, e.g. "Front". */
   phaseLabel: string | null;
-  guideView: 'frontal' | 'profile';
+  /** Scan angle the reference mannequin demonstrates. */
+  guidePhase: ScanPhaseId;
 }
 
 /** Large camera preview with the body guide overlay, plus the camera-off / loading / error states. */
-export function ScanViewport({ camera, phaseLabel, guideView }: ScanViewportProps) {
+export function ScanViewport({ camera, phaseLabel, guidePhase }: ScanViewportProps) {
   const { status, error, facingMode, videoRef, start } = camera;
   const active = status === 'active';
   const canRetry = error !== 'unsupported' && error !== 'insecure-context';
@@ -32,7 +34,7 @@ export function ScanViewport({ camera, phaseLabel, guideView }: ScanViewportProp
         hidden={!active}
       />
 
-      {active && <BodyGuideOverlay view={guideView} />}
+      {active && <BodyGuideOverlay phase={guidePhase} />}
 
       <AnimatePresence>
         {active && phaseLabel && (

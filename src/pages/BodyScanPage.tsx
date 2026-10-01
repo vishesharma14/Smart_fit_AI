@@ -110,7 +110,7 @@ export function BodyScanPage() {
           <ScanViewport
             camera={camera}
             phaseLabel={showPhaseOnPreview ? session.currentPhase.label : null}
-            guideView={session.currentPhase.id === 'left' || session.currentPhase.id === 'right' ? 'profile' : 'frontal'}
+            guidePhase={session.currentPhase.id}
           />
           {cameraActive && (
             <div className="scan-page__camera-actions">
