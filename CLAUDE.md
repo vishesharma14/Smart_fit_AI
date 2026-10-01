@@ -60,8 +60,10 @@ src/
   components/         reusable UI components (SkipLink, Button, BrandLogo, StepProgress)
   components/form/    form primitives (FormField, FormCard, TextInput, SegmentedControl, ChoiceCards)
   components/icons/   custom Lucide-style icons (clothing)
-  components/scan/    ScanViewport (camera + states), BodyGuideOverlay (3D wireframe reference
-                      mannequin, procedural SVG — see mannequin/), ScanStatus, ScanPhaseProgress
+  components/scan/    ScanViewport (camera + states), BodyGuideOverlay (scan frame + one 3D
+                      reference mannequin), ScanStatus, ScanPhaseProgress
+  components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
+                      scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage)
   routes/router.tsx   route definitions (createBrowserRouter)
@@ -96,6 +98,7 @@ Intended stack:
 - Framer Motion (animation)
 - Custom CSS (no UI framework unless explicitly approved)
 - Lucide React (icons)
+- Three.js (only for the 3D reference mannequin on the Body Scan page; lazy-loaded)
 
 If the repository already contains a working setup, use the existing project choices
 unless there is a strong technical reason to change them. Explain any such reason
