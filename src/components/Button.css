@@ -55,7 +55,7 @@
 }
 
 .button--primary:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
 }
 
 /* Secondary */
@@ -70,6 +70,10 @@
 .button--secondary:hover {
   border-color: rgb(148 163 214 / 0.45);
   background: var(--color-surface-raised);
+}
+
+.button--secondary:active {
+  transform: scale(0.98);
 }
 
 /* Unavailable: stays focusable (aria-disabled) so assistive tech can announce why */

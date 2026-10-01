@@ -1,10 +1,9 @@
 /** Central list of application paths. Add a path here only when its route exists. */
 export const PATHS = {
   home: '/',
+  userInfo: '/details',
+  clothing: '/clothing',
 } as const;
 
-/**
- * Where the Welcome page's Start button leads. `null` while the next step
- * (User Information) has not been built; the button shows as unavailable.
- */
-export const WELCOME_NEXT_PATH: string | null = null;
+/** Where the Welcome page's Start button leads. `null` hides navigation and shows the button as unavailable. */
+export const WELCOME_NEXT_PATH: string | null = PATHS.userInfo;

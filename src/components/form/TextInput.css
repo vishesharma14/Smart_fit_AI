@@ -1,0 +1,65 @@
+.text-input {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 3.25rem;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: rgb(7 10 20 / 0.55);
+  transition:
+    border-color var(--transition-base),
+    box-shadow var(--transition-base),
+    background-color var(--transition-base);
+}
+
+.text-input:hover {
+  border-color: rgb(148 163 214 / 0.42);
+}
+
+.text-input:focus-within {
+  border-color: var(--color-primary);
+  background: rgb(7 10 20 / 0.75);
+  box-shadow: 0 0 0 3px rgb(139 92 246 / 0.28);
+}
+
+.text-input--invalid,
+.text-input--invalid:hover {
+  border-color: var(--color-danger);
+}
+
+.text-input--invalid:focus-within {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgb(248 113 113 / 0.25);
+}
+
+.text-input__control {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 3.125rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+/* The wrapper draws the focus ring */
+.text-input__control:focus-visible {
+  outline: none;
+}
+
+.text-input__control::placeholder {
+  color: var(--color-text-subtle);
+  opacity: 1;
+}
+
+.text-input__suffix {
+  flex-shrink: 0;
+  padding-left: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}

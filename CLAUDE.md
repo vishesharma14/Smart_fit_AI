@@ -34,10 +34,12 @@ current step explicitly asks for it.**
 
 ## 2. Current Repository State
 
-Step 1 (application foundation) and Step 2 (Welcome page) are complete. The project
-is a Vite + React + TypeScript app with a single route (`/`, the Welcome page). The
-Welcome page's Start button stays unavailable until `WELCOME_NEXT_PATH` in
-`src/routes/paths.ts` points to a real route.
+Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information).
+
+Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
+`/clothing` (minimal placeholder until Clothing Selection is built).
+User information is kept in memory only (not persisted); height/weight display
+units and theme are persisted.
 
 Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm run preview`.
 
@@ -46,16 +48,18 @@ src/
   main.tsx            entry point (imports global CSS, mounts <App />)
   App.tsx             MotionConfig + RouterProvider
   assets/             static assets imported by code
-  components/         reusable UI components (SkipLink, Button, BrandLogo)
+  components/         reusable UI components (SkipLink, Button, BrandLogo, StepProgress)
+  components/form/    form primitives (FormField, TextInput, SegmentedControl, ChoiceCards)
   layouts/            route layouts (RootLayout: skip link + <main> + <Outlet />)
-  pages/              route pages (HomePage: Welcome page)
+  pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage placeholder)
   routes/router.tsx   route definitions (createBrowserRouter)
-  routes/paths.ts     central path constants + WELCOME_NEXT_PATH
+  routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
-                      (user, fit, settings); only units/theme are persisted
-  hooks/              reusable hooks (useDocumentTitle)
+                      (user, fit, settings); only display units/theme are persisted
+  hooks/              reusable hooks (useDocumentTitle, useUserInfoForm)
   services/           side-effect/IO modules (safe localStorage wrapper)
-  utils/              pure helpers and constants
+  utils/              pure helpers: constants, motion presets, unit conversion,
+                      user-info validation
   types/domain.ts     domain types (lengths in cm, weight in kg)
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```

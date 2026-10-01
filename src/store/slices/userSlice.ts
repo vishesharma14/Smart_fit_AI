@@ -13,7 +13,7 @@ export interface UserSlice {
 }
 
 const initialUserState = {
-  userInfo: { heightCm: null, weightKg: null },
+  userInfo: { name: '', gender: null, age: null, heightCm: null, weightKg: null },
   measurements: null,
   selectedCategoryId: null,
 } satisfies Partial<UserSlice>;
