@@ -1,17 +1,21 @@
 import type { StateCreator } from 'zustand';
-import type { ThemePreference, UnitSystem } from '../../types/domain';
+import type { HeightUnit, ThemePreference, WeightUnit } from '../../types/domain';
 import type { AppState } from '../types';
 
 export interface SettingsSlice {
-  units: UnitSystem;
+  heightUnit: HeightUnit;
+  weightUnit: WeightUnit;
   theme: ThemePreference;
-  setUnits: (units: UnitSystem) => void;
+  setHeightUnit: (unit: HeightUnit) => void;
+  setWeightUnit: (unit: WeightUnit) => void;
   setTheme: (theme: ThemePreference) => void;
 }
 
 export const createSettingsSlice: StateCreator<AppState, [], [], SettingsSlice> = (set) => ({
-  units: 'metric',
+  heightUnit: 'cm',
+  weightUnit: 'kg',
   theme: 'dark',
-  setUnits: (units) => set({ units }),
+  setHeightUnit: (heightUnit) => set({ heightUnit }),
+  setWeightUnit: (weightUnit) => set({ weightUnit }),
   setTheme: (theme) => set({ theme }),
 });

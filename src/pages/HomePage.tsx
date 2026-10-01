@@ -1,23 +1,12 @@
-import { motion, type Variants } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowRight, Shirt, Sparkles } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Button } from '../components/Button';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { WELCOME_NEXT_PATH } from '../routes/paths';
 import { APP_DESCRIPTION, pageTitle } from '../utils/constants';
+import { EASE_OUT, fadeUpItem as item, staggerContainer as container } from '../utils/motion';
 import './HomePage.css';
-
-const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-const container: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.1 } },
-};
-
-const item: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE_OUT } },
-};
 
 const START_UNAVAILABLE_NOTE_ID = 'start-unavailable-note';
 

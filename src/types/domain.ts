@@ -9,12 +9,26 @@
  * kilograms. Unit conversion happens only at the UI boundary.
  */
 
-export type UnitSystem = 'metric' | 'imperial';
+/** Display unit for height. Values are always stored in centimetres. */
+export type HeightUnit = 'cm' | 'ft-in';
+
+/** Display unit for weight. Values are always stored in kilograms. */
+export type WeightUnit = 'kg' | 'lb';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 
-/** Basic information the user provides about themselves. */
+/** Size range the user shops in. */
+export type Gender = 'men' | 'women' | 'children';
+
+/**
+ * Basic information the user enters about themselves. Height and weight are
+ * self-reported values, not body measurements.
+ */
 export interface UserInfo {
+  /** Optional display name. Empty string when not provided. */
+  name: string;
+  gender: Gender | null;
+  age: number | null;
   heightCm: number | null;
   weightKg: number | null;
 }
