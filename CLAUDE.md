@@ -35,11 +35,16 @@ current step explicitly asks for it.**
 ## 2. Current Repository State
 
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
-4 (Clothing Selection).
+4 (Clothing Selection), 5 (Body Scan foundation).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
-`/clothing` Clothing Selection (step 2 of 4) → `/scan` (minimal placeholder until
-Body Scan is built).
+`/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4).
+
+Body Scan status: real camera (getUserMedia, video only) with on-device lighting
+and movement checks. **No body/pose detection engine is connected**
+(`services/bodyDetection.ts` exports `bodyDetector = null`), so the page runs as a
+labelled "scan guidance preview": angles can only be *previewed*, never *captured*,
+and no measurements exist. Scan session state is local to the page (no global state).
 User information and the clothing selection are kept in memory only (not
 persisted); height/weight display units and theme are persisted.
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
@@ -55,18 +60,25 @@ src/
   components/         reusable UI components (SkipLink, Button, BrandLogo, StepProgress)
   components/form/    form primitives (FormField, FormCard, TextInput, SegmentedControl, ChoiceCards)
   components/icons/   custom Lucide-style icons (clothing)
+  components/scan/    ScanViewport (camera + states), BodyGuideOverlay (scan frame + one 3D
+                      reference mannequin), ScanStatus, ScanPhaseProgress
+  components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
+                      scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
-  pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage,
-                      BodyScanPage placeholder)
+  pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage)
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
                       (user, fit, settings); only display units/theme are persisted
-  hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm)
-  services/           side-effect/IO modules (safe localStorage wrapper)
+  hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
+                      useCamera, useFrameQuality, useScanSession)
+  services/           side-effect/IO modules (safe localStorage wrapper, camera,
+                      frame analysis, body detection contract)
   utils/              pure helpers: constants, motion presets, unit conversion,
-                      user-info validation, clothing catalog + validation
+                      user-info validation, clothing catalog + validation,
+                      scan phases + scan guidance
   types/domain.ts     domain types (lengths in cm, weight in kg)
+  types/scan.ts       scan/camera types
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 
@@ -86,6 +98,7 @@ Intended stack:
 - Framer Motion (animation)
 - Custom CSS (no UI framework unless explicitly approved)
 - Lucide React (icons)
+- Three.js (only for the 3D reference mannequin on the Body Scan page; lazy-loaded)
 
 If the repository already contains a working setup, use the existing project choices
 unless there is a strong technical reason to change them. Explain any such reason
