@@ -19,7 +19,7 @@ export const SCAN_PHASES: ScanPhaseDefinition[] = [
     id: 'front',
     label: 'Front',
     instruction: 'Face the camera',
-    detail: 'Stand straight, arms slightly away from your body and feet hip-width apart.',
+    detail: 'Stand straight and face the camera.',
   },
   {
     id: 'left',
@@ -31,7 +31,7 @@ export const SCAN_PHASES: ScanPhaseDefinition[] = [
     id: 'back',
     label: 'Back',
     instruction: 'Turn your back to the camera',
-    detail: 'Keep turning to your left until your back faces the camera, arms slightly away from your body.',
+    detail: 'Keep turning to your left until your back faces the camera.',
   },
   {
     id: 'right',

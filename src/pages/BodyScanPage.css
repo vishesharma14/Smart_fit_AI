@@ -71,6 +71,36 @@
   color: var(--color-text);
 }
 
+.scan-page__region {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 34rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgb(34 211 238 / 0.28);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgb(34 211 238 / 0.08), rgb(139 92 246 / 0.06));
+}
+
+.scan-page__region-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-secondary);
+}
+
+.scan-page__region-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+}
+
+.scan-page__region-text {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 .scan-page__title {
   font-family: var(--font-display);
   font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem);

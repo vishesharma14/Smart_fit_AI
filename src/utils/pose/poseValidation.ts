@@ -3,24 +3,30 @@ import type { ScanPhaseId } from '../../types/scan';
 import { POSE_SCAN_CONFIG, type PoseScanConfig } from './poseConfig';
 import { LM, mid, toPixels, type Point, type VisibleRegion } from './landmarks';
 import { estimateOrientation, type CoarseView, type OrientationCalibration, type OrientationEstimate } from './poseOrientation';
+import { SCAN_REGIONS, type BodyPart, type ScanRegionDefinition } from './scanRegions';
 
 /*
- * Per-frame pose validation for one scan angle. Checks run in a fixed order
- * and the first failure is reported, so the user always gets the single most
- * useful instruction. Every check reads real landmarks from the pose model;
- * nothing here estimates body measurements.
+ * Per-frame pose validation for one scan angle and body region. Checks run in
+ * a fixed order and the first failure is reported, so the user always gets
+ * the single most useful instruction. Every check reads real landmarks from
+ * the pose model; nothing here estimates body measurements. The region
+ * (full, upper or lower body — see scanRegions) decides which landmarks,
+ * bounds and posture checks apply.
  */
 
-export type BodyPart = 'head' | 'shoulders' | 'hips' | 'knees' | 'feet';
+export type { BodyPart };
 
 export type PoseIssue =
   | { kind: 'no-person' }
   | { kind: 'multiple-people' }
   | { kind: 'too-close' }
   | { kind: 'too-far' }
-  /** `canTilt`: the whole body would fit by tilting the camera instead of stepping back. */
-  | { kind: 'head-out'; canTilt: boolean }
-  | { kind: 'feet-out'; canTilt: boolean }
+  /**
+   * The top / bottom of the scanned region is outside the preview. `canTilt`:
+   * the region would fit by aiming the camera instead of stepping back.
+   */
+  | { kind: 'top-out'; canTilt: boolean }
+  | { kind: 'bottom-out'; canTilt: boolean }
   | { kind: 'off-centre' }
   | { kind: 'body-hidden'; part: BodyPart }
   | { kind: 'wrong-orientation'; detected: ScanPhaseId | null }
@@ -34,14 +40,15 @@ export type PoseIssueKind = PoseIssue['kind'];
 
 /** Geometry behind the decision, shown by the debug panel. */
 export interface PoseMetrics {
-  /** Estimated head-top-to-feet height ÷ visible preview height. */
-  bodyHeight: number;
-  torsoTiltDeg: number;
+  /** Height of the scanned region (its top to bottom bound) ÷ visible preview height. */
+  span: number;
+  /** Lean from vertical: of the torso, or of the legs when the torso is not in the region. */
+  tiltDeg: number;
   /** Arm angles away from the torso (person's left, right). */
   armAnglesDeg: [number, number];
   stanceRatio: number;
-  /** Torso length in pixels (used to normalise movement). */
-  torsoPx: number;
+  /** Region reference length in pixels (used to normalise movement). */
+  scalePx: number;
 }
 
 export interface PoseAssessment {
@@ -64,12 +71,15 @@ export interface AssessPoseInput {
   target: ScanPhaseId;
   calibration: OrientationCalibration | null;
   previousView: CoarseView | null;
+  /** Body region being scanned (defaults to the full body). */
+  scanRegion?: ScanRegionDefinition;
   config?: PoseScanConfig;
 }
 
 /** Landmarks for each side (left, right) of a body part; a side counts as seen if any of its points is. */
 const PAIRS: Record<Exclude<BodyPart, 'head'>, readonly [readonly number[], readonly number[]]> = {
   shoulders: [[LM.leftShoulder], [LM.rightShoulder]],
+  elbows: [[LM.leftElbow], [LM.rightElbow]],
   hips: [[LM.leftHip], [LM.rightHip]],
   knees: [[LM.leftKnee], [LM.rightKnee]],
   feet: [
@@ -77,26 +87,6 @@ const PAIRS: Record<Exclude<BodyPart, 'head'>, readonly [readonly number[], read
     [LM.rightAnkle, LM.rightHeel, LM.rightFoot],
   ],
 };
-
-/** Points that must stay inside the visible preview (left/right edges). */
-const EDGE_POINTS = [
-  LM.leftShoulder,
-  LM.rightShoulder,
-  LM.leftElbow,
-  LM.rightElbow,
-  LM.leftWrist,
-  LM.rightWrist,
-  LM.leftHip,
-  LM.rightHip,
-  LM.leftKnee,
-  LM.rightKnee,
-  LM.leftAnkle,
-  LM.rightAnkle,
-  LM.leftHeel,
-  LM.rightHeel,
-  LM.leftFoot,
-  LM.rightFoot,
-] as const;
 
 const FEET = [LM.leftAnkle, LM.rightAnkle, LM.leftHeel, LM.rightHeel, LM.leftFoot, LM.rightFoot] as const;
 
@@ -164,6 +154,7 @@ export function assessPose({
   target,
   calibration,
   previousView,
+  scanRegion = SCAN_REGIONS.full,
   config = POSE_SCAN_CONFIG,
 }: AssessPoseInput): PoseAssessment {
   const people = countPeople(frame.landmarks);
@@ -187,21 +178,51 @@ export function assessPose({
 
   const shoulderMid = mid(px[LM.leftShoulder], px[LM.rightShoulder]);
   const hipMid = mid(px[LM.leftHip], px[LM.rightHip]);
+  const kneeMid = mid(px[LM.leftKnee], px[LM.rightKnee]);
+  const ankleMid = mid(px[LM.leftAnkle], px[LM.rightAnkle]);
   const torsoPx = Math.max(Math.hypot(shoulderMid.x - hipMid.x, shoulderMid.y - hipMid.y), 1);
+  const thighPx = Math.max(Math.hypot(kneeMid.x - hipMid.x, kneeMid.y - hipMid.y), 1);
+  // Reference length for the region. Without the shoulders in view, the thigh stands in for the torso
+  // (a thigh is roughly 0.9 of a torso length).
+  const scalePx = scanRegion.scale === 'torso' ? torsoPx : thighPx * 1.1;
 
-  // Head top is above the landmarks (which stop at the eyes and ears): extrapolate from the neck length.
+  // Region bounds from real landmarks. The head top is above the landmarks (which stop at the eyes and
+  // ears), so it is extrapolated from the neck length.
   const earMid = mid(px[LM.leftEar], px[LM.rightEar]);
-  const headTop = earMid.y - 0.7 * Math.max(shoulderMid.y - earMid.y, 0);
-  const feetBottom = Math.max(...FEET.map((i) => px[i].y));
+  const faceTop = Math.min(px[LM.nose].y, earMid.y);
+  const hipTop = Math.min(px[LM.leftHip].y, px[LM.rightHip].y);
+  const hipBottom = Math.max(px[LM.leftHip].y, px[LM.rightHip].y);
+  const regionTop =
+    scanRegion.top === 'head-top'
+      ? earMid.y - 0.7 * Math.max(shoulderMid.y - earMid.y, 0)
+      : scanRegion.top === 'face'
+        ? faceTop - 0.1 * torsoPx
+        : hipTop - 0.35 * thighPx;
+  const regionBottom = scanRegion.bottom === 'feet' ? Math.max(...FEET.map((i) => px[i].y)) : hipBottom + 0.25 * torsoPx;
 
   const top = region.y0 * height;
   const visibleHeight = (region.y1 - region.y0) * height;
   const left = region.x0 * width;
   const visibleWidth = (region.x1 - region.x0) * width;
-  const bodyHeight = (feetBottom - headTop) / visibleHeight;
+  const span = (regionBottom - regionTop) / visibleHeight;
 
-  const orientation = estimateOrientation(px, pose, world, calibration, previousView);
-  const torsoTiltDeg = degrees(Math.atan2(Math.abs(hipMid.x - shoulderMid.x), Math.max(hipMid.y - shoulderMid.y, 1e-6)));
+  // Orientation uses every cue the camera actually sees in this frame, whatever the region requires: a face
+  // in view still helps a lower-body scan tell front from back, and feet out of view never vote.
+  const inFrame = (i: number) => pose[i].x > 0.01 && pose[i].x < 0.99 && pose[i].y > 0.01 && pose[i].y < 0.99;
+  // The face only votes when the whole head is in view: a face cut off by the frame edge has low visibility
+  // for the wrong reason and would read as "facing away".
+  const headTopNormalised = (earMid.y - 0.7 * Math.max(shoulderMid.y - earMid.y, 0)) / height;
+  const cues = {
+    face: headTopNormalised > 0.01 && inFrame(LM.nose) && (inFrame(LM.leftEar) || inFrame(LM.rightEar)),
+    // Width is judged from the shoulders only when the region includes the torso, so the front-view
+    // calibration and later frames always use the same measure.
+    shoulders: scanRegion.scale === 'torso' && inFrame(LM.leftShoulder) && inFrame(LM.rightShoulder),
+    feet: FEET.some((i) => inFrame(i) && seen(i)),
+  };
+  const orientation = estimateOrientation(px, pose, world, calibration, previousView, cues, scalePx);
+  // Upright: the torso when it is in the region, otherwise the legs (hips to ankles).
+  const [upper, lower] = scanRegion.scale === 'torso' ? [shoulderMid, hipMid] : [hipMid, ankleMid];
+  const tiltDeg = degrees(Math.atan2(Math.abs(lower.x - upper.x), Math.max(lower.y - upper.y, 1e-6)));
   const down = { x: hipMid.x - shoulderMid.x, y: hipMid.y - shoulderMid.y };
   const armAngle = (shoulder: number, elbow: number, wrist: number) => {
     const end = seen(wrist) ? px[wrist] : px[elbow];
@@ -218,7 +239,7 @@ export function assessPose({
     issue: null,
     people,
     orientation,
-    metrics: { bodyHeight, torsoTiltDeg, armAnglesDeg, stanceRatio, torsoPx },
+    metrics: { span, tiltDeg, armAnglesDeg, stanceRatio, scalePx },
     landmarks: pose,
     worldLandmarks: world,
     pixels: px,
@@ -228,88 +249,86 @@ export function assessPose({
   // 1. Exactly one person.
   if (people > 1) return fail({ kind: 'multiple-people' });
 
-  // 2. Head and feet inside the visible preview.
-  const headOut = headTop < top + config.verticalMargin * visibleHeight;
-  const feetOut = feetBottom > top + visibleHeight * (1 - config.verticalMargin);
-  if (headOut || feetOut) {
-    if ((headOut && feetOut) || bodyHeight > config.maxBodyHeight) return fail({ kind: 'too-close' });
-    // The body is small enough to fit, just shifted: aiming the camera fixes it without moving back.
-    const canTilt = bodyHeight <= 1 - 2 * config.verticalMargin;
-    return fail({ kind: headOut ? 'head-out' : 'feet-out', canTilt });
+  // 2. Top and bottom of the scanned region inside the visible preview.
+  const topOut = regionTop < top + config.verticalMargin * visibleHeight;
+  const bottomOut = regionBottom > top + visibleHeight * (1 - config.verticalMargin);
+  if (topOut || bottomOut) {
+    if ((topOut && bottomOut) || span > scanRegion.maxSpan) return fail({ kind: 'too-close' });
+    // The region is small enough to fit, just shifted: aiming the camera fixes it without moving back.
+    const canTilt = span <= 1 - 2 * config.verticalMargin;
+    return fail({ kind: topOut ? 'top-out' : 'bottom-out', canTilt });
   }
 
-  // 3. Distance from the camera, from the body's share of the preview height.
-  if (bodyHeight > config.maxBodyHeight) return fail({ kind: 'too-close' });
-  if (bodyHeight < config.minBodyHeight) return fail({ kind: 'too-far' });
+  // 3. Distance from the camera, from the region's share of the preview height.
+  if (span > scanRegion.maxSpan) return fail({ kind: 'too-close' });
+  if (span < scanRegion.minSpan) return fail({ kind: 'too-far' });
 
-  // 4. Arms, legs and feet inside the left and right edges.
+  // 4. The region's arms / legs inside the left and right edges.
   const margin = config.horizontalMargin * visibleWidth;
-  if (EDGE_POINTS.some((i) => px[i].x < left + margin || px[i].x > left + visibleWidth - margin)) {
+  if (scanRegion.edgePoints.some((i) => px[i].x < left + margin || px[i].x > left + visibleWidth - margin)) {
     return fail({ kind: 'off-centre' });
   }
 
-  // 5. Key joints clearly visible (not hidden by clothing, furniture or poor light). Side-on, the far
-  //    side of the body is naturally hidden, so one of each pair is enough.
+  // 5. The region's key joints clearly visible (not hidden by clothing, furniture or poor light).
+  //    Side-on, the far side of the body is naturally hidden, so one of each pair is enough.
   const frontal = orientation.view === 'frontal';
-  // From behind the face is hidden by design, so the head is only required for the other angles.
-  const headSeen = frontal && target === 'front' ? seen(LM.nose) : seen(LM.nose) || seen(LM.leftEar) || seen(LM.rightEar);
-  if (target !== 'back' && !headSeen) return fail({ kind: 'body-hidden', part: 'head' });
-  for (const [part, [leftSide, rightSide]] of Object.entries(PAIRS) as [
-    Exclude<BodyPart, 'head'>,
-    readonly [readonly number[], readonly number[]],
-  ][]) {
+  for (const part of scanRegion.requiredParts) {
+    if (part === 'head') {
+      // From behind the face is hidden by design, so the head is only checked for the other angles.
+      if (target === 'back') continue;
+      const headSeen =
+        frontal && target === 'front' ? seen(LM.nose) : seen(LM.nose) || seen(LM.leftEar) || seen(LM.rightEar);
+      if (!headSeen) return fail({ kind: 'body-hidden', part });
+      continue;
+    }
+    const [leftSide, rightSide] = PAIRS[part];
     const leftSeen = leftSide.some(seen);
     const rightSeen = rightSide.some(seen);
-    const visible = frontal ? leftSeen && rightSeen : leftSeen || rightSeen;
-    if (!visible) return fail({ kind: 'body-hidden', part });
+    if (!(frontal ? leftSeen && rightSeen : leftSeen || rightSeen)) return fail({ kind: 'body-hidden', part });
   }
 
   // 6. Facing the requested direction.
   if (orientation.orientation !== target) return fail({ kind: 'wrong-orientation', detected: orientation.orientation });
 
   // 7. Standing upright.
-  if (torsoTiltDeg > config.maxTorsoTiltDeg) return fail({ kind: 'not-upright' });
+  if (tiltDeg > config.maxTorsoTiltDeg) return fail({ kind: 'not-upright' });
 
-  // 8. Front and back: arms slightly away from the body and feet apart, so the torso and legs are separable.
+  // 8. Front and back: arms slightly away from the body and feet apart, where they are in the region, so the
+  //    torso and legs are separable.
   if (target === 'front' || target === 'back') {
-    if (Math.min(...armAnglesDeg) < config.minArmAngleDeg) return fail({ kind: 'arms-down' });
-    if (Math.max(...armAnglesDeg) > config.maxArmAngleDeg) return fail({ kind: 'arms-raised' });
-    if (stanceRatio < config.minStanceRatio) return fail({ kind: 'feet-together' });
-    if (stanceRatio > config.maxStanceRatio) return fail({ kind: 'feet-wide' });
+    if (scanRegion.checkArms) {
+      if (Math.min(...armAnglesDeg) < config.minArmAngleDeg) return fail({ kind: 'arms-down' });
+      if (Math.max(...armAnglesDeg) > config.maxArmAngleDeg) return fail({ kind: 'arms-raised' });
+    }
+    if (scanRegion.checkStance) {
+      if (stanceRatio < config.minStanceRatio) return fail({ kind: 'feet-together' });
+      if (stanceRatio > config.maxStanceRatio) return fail({ kind: 'feet-wide' });
+    }
   }
 
   return result;
 }
 
-/** Landmarks tracked for stillness: head, torso and leg joints. */
-const STILLNESS_POINTS = [
-  LM.nose,
-  LM.leftShoulder,
-  LM.rightShoulder,
-  LM.leftHip,
-  LM.rightHip,
-  LM.leftKnee,
-  LM.rightKnee,
-  LM.leftAnkle,
-  LM.rightAnkle,
-] as const;
-
 export interface StillnessSample {
   time: number;
   pixels: Point[];
-  torsoPx: number;
+  /** Region reference length in pixels at this sample. */
+  scalePx: number;
 }
 
 /**
  * How much the body moved over the recent samples: the average spread of
- * each tracked joint around its mean position, relative to torso length.
- * Returns null until there are enough samples to judge.
+ * each tracked joint around its mean position, relative to the region's
+ * reference length. Returns null until there are enough samples to judge.
  */
-export function measureJitter(samples: StillnessSample[]): number | null {
+export function measureJitter(
+  samples: StillnessSample[],
+  points: readonly number[] = SCAN_REGIONS.full.stillnessPoints,
+): number | null {
   if (samples.length < 3) return null;
-  const torso = samples.reduce((sum, sample) => sum + sample.torsoPx, 0) / samples.length;
+  const scale = samples.reduce((sum, sample) => sum + sample.scalePx, 0) / samples.length;
   let spread = 0;
-  for (const index of STILLNESS_POINTS) {
+  for (const index of points) {
     const mx = samples.reduce((sum, sample) => sum + sample.pixels[index].x, 0) / samples.length;
     const my = samples.reduce((sum, sample) => sum + sample.pixels[index].y, 0) / samples.length;
     const maxDistance = Math.max(
@@ -317,7 +336,7 @@ export function measureJitter(samples: StillnessSample[]): number | null {
     );
     spread += maxDistance;
   }
-  return spread / STILLNESS_POINTS.length / torso;
+  return spread / points.length / scale;
 }
 
 /** Consecutive-valid-frame tracking for auto-capture. */

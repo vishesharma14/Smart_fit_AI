@@ -26,7 +26,9 @@ export interface ScanCapture {
   worldLandmarks: PoseLandmark[];
   videoWidth: number;
   videoHeight: number;
-  /** Projected shoulder width ÷ torso length at capture (front view calibrates side detection). */
+  /** Body region that was validated for this capture. */
+  scanRegion: 'full' | 'upper' | 'lower';
+  /** Width ratio at capture (shoulders ÷ torso, or hips ÷ thigh for the lower body); the front view calibrates side detection. */
   widthRatio: number;
   /** Orientation agreement (0–1) at capture. */
   orientationConfidence: number;

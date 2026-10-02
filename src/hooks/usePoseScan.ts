@@ -5,6 +5,7 @@ import type { FrameQuality, ScanCapture, ScanPhaseId } from '../types/scan';
 import { visibleRegion } from '../utils/pose/landmarks';
 import { POSE_SCAN_CONFIG } from '../utils/pose/poseConfig';
 import type { CoarseView, OrientationCalibration } from '../utils/pose/poseOrientation';
+import type { ScanRegionDefinition } from '../utils/pose/scanRegions';
 import {
   HOLD_RESET,
   assessPose,
@@ -46,6 +47,8 @@ interface UsePoseScanOptions {
   /** Run detection only while the scan is in progress. */
   scanning: boolean;
   target: ScanPhaseId;
+  /** Body region to validate (from the selected clothing). */
+  scanRegion: ScanRegionDefinition;
   calibration: OrientationCalibration | null;
   /** Lighting and frame-difference movement from the existing frame checks. */
   quality: FrameQuality | null;
@@ -84,6 +87,7 @@ export function usePoseScan({
   cameraActive,
   scanning,
   target,
+  scanRegion,
   calibration,
   quality,
   onCapture,
@@ -171,12 +175,12 @@ export function usePoseScan({
       while (runTimes.length && runTimes[0] < now - 1000) runTimes.shift();
 
       const region = visibleRegion(video.videoWidth, video.videoHeight, video.clientWidth, video.clientHeight);
-      const assessment = assessPose({ frame, region, target, calibration: calibrationValue, previousView });
+      const assessment = assessPose({ frame, region, target, calibration: calibrationValue, previousView, scanRegion });
       previousView = assessment.orientation?.view ?? null;
 
       // Stillness from landmark movement over a short window.
       if (assessment.pixels && assessment.metrics) {
-        stillness.push({ time: now, pixels: assessment.pixels, torsoPx: assessment.metrics.torsoPx });
+        stillness.push({ time: now, pixels: assessment.pixels, scalePx: assessment.metrics.scalePx });
       } else {
         stillness.length = 0;
       }
@@ -184,7 +188,7 @@ export function usePoseScan({
       while (stillness.length > MIN_STILLNESS_SAMPLES && stillness[0].time < now - POSE_SCAN_CONFIG.stillnessWindowMs) {
         stillness.shift();
       }
-      const jitter = measureJitter(stillness);
+      const jitter = measureJitter(stillness, scanRegion.stillnessPoints);
       const moving = jitter === null || jitter > POSE_SCAN_CONFIG.maxJitter;
 
       const frameQuality = qualityRef.current;
@@ -210,6 +214,7 @@ export function usePoseScan({
           worldLandmarks: averageLandmarks(holdFrames.map((f) => f.world)),
           videoWidth: frame.videoWidth,
           videoHeight: frame.videoHeight,
+          scanRegion: scanRegion.id,
           widthRatio: assessment.orientation.widthRatio,
           orientationConfidence: assessment.orientation.confidence,
         });
@@ -240,7 +245,7 @@ export function usePoseScan({
       // Never show a stale result after pausing or moving to the next angle.
       setLive(IDLE_LIVE);
     };
-  }, [engine, scanning, target, calibrationRatio, intervalMs, videoRef]);
+  }, [engine, scanning, target, scanRegion, calibrationRatio, intervalMs, videoRef]);
 
   const retry = useCallback(() => {
     setFailed(false);

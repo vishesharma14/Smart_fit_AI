@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router';
-import { ArrowLeft, Cpu, Pause, Play, PowerOff, RotateCcw, ShieldCheck, SwitchCamera } from 'lucide-react';
+import { ArrowLeft, Cpu, Pause, Play, PowerOff, RotateCcw, ScanLine, ShieldCheck, SwitchCamera } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Button } from '../components/Button';
 import { StepProgress } from '../components/StepProgress';
@@ -21,6 +21,7 @@ import { useAppStore } from '../store/useAppStore';
 import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
+import { scanRegionFor } from '../utils/pose/scanRegions';
 import { deriveScanGuidance } from '../utils/scanGuidance';
 import { previewAspectRatio } from '../utils/scanPreview';
 import { SCAN_PHASES, type ScanPhaseDefinition } from '../utils/scanPhases';
@@ -34,6 +35,8 @@ const CAPTURED_MESSAGE_MS = 1000;
 export function BodyScanPage() {
   useDocumentTitle(pageTitle('Body scan'));
   const clothing = useAppStore((s) => s.clothingSelection);
+  // The selected garment decides which body region is validated (full body when nothing is selected).
+  const scanRegion = scanRegionFor(clothing?.type);
   const camera = useCamera();
   const session = useScanSession();
   const [searchParams] = useSearchParams();
@@ -70,6 +73,7 @@ export function BodyScanPage() {
     cameraActive,
     scanning: scanning && !justCaptured,
     target: session.currentPhase.id,
+    scanRegion,
     calibration: frontCapture ? { frontalWidthRatio: frontCapture.widthRatio } : null,
     quality,
     onCapture: handleCapture,
@@ -106,6 +110,7 @@ export function BodyScanPage() {
     quality,
     pose,
     justCaptured: session.status === 'scanning' ? justCaptured : null,
+    scanRegion,
   });
 
   const clothingLabel = clothing
@@ -142,9 +147,18 @@ export function BodyScanPage() {
             Body <span className="flow-step__title-accent">scan</span>
           </h1>
           <p className="scan-page__lead">
-            Stand back so your whole body is visible, then turn to your left a quarter turn at a time: front, side, back
-            and other side. Each angle is captured automatically once you hold still.
+            Turn to your left a quarter turn at a time: front, side, back and other side. Each angle is captured
+            automatically once your pose is confirmed and you hold still.
           </p>
+          <div className="scan-page__region" data-region={scanRegion.id}>
+            <ScanLine className="scan-page__region-icon" aria-hidden="true" size={20} strokeWidth={1.75} />
+            <div>
+              <p className="scan-page__region-title">{scanRegion.label}</p>
+              <p className="scan-page__region-text">
+                {scanRegion.summary} {scanRegion.postureHint}
+              </p>
+            </div>
+          </div>
         </motion.section>
 
         <motion.div
@@ -157,6 +171,7 @@ export function BodyScanPage() {
             camera={camera}
             phaseLabel={showPhaseOnPreview ? session.currentPhase.label : null}
             guidePhase={session.currentPhase.id}
+            guideRange={scanRegion.guideRange}
             overlay={
               debug && (
                 <PoseDebugOverlay
@@ -202,7 +217,7 @@ export function BodyScanPage() {
 
           {cameraActive && <ScanControls session={session} />}
 
-          {debug && cameraActive && <PoseDebugPanel pose={pose} camera={camera} />}
+          {debug && cameraActive && <PoseDebugPanel pose={pose} camera={camera} scanRegion={scanRegion} />}
         </motion.section>
 
         <motion.p className="scan-page__privacy" variants={fadeUpItem}>

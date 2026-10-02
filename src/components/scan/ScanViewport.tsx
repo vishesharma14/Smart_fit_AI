@@ -14,12 +14,14 @@ interface ScanViewportProps {
   phaseLabel: string | null;
   /** Scan angle the reference mannequin demonstrates. */
   guidePhase: ScanPhaseId;
+  /** Part of the reference figure to show for the scanned body region. */
+  guideRange?: [number, number];
   /** Optional layer drawn over the live preview (e.g. the pose debug skeleton). */
   overlay?: ReactNode;
 }
 
 /** Large camera preview with the body guide overlay, plus the camera-off / loading / error states. */
-export function ScanViewport({ camera, phaseLabel, guidePhase, overlay }: ScanViewportProps) {
+export function ScanViewport({ camera, phaseLabel, guidePhase, guideRange, overlay }: ScanViewportProps) {
   const { status, error, facingMode, videoRef, start } = camera;
   const active = status === 'active';
   const canRetry = error !== 'unsupported' && error !== 'insecure-context';
@@ -38,7 +40,7 @@ export function ScanViewport({ camera, phaseLabel, guidePhase, overlay }: ScanVi
         hidden={!active}
       />
 
-      {active && <BodyGuideOverlay phase={guidePhase} mirrored={mirrored} />}
+      {active && <BodyGuideOverlay phase={guidePhase} mirrored={mirrored} range={guideRange} />}
       {active && overlay}
 
       <AnimatePresence>

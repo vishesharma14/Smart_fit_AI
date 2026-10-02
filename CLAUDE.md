@@ -35,7 +35,8 @@ current step explicitly asks for it.**
 ## 2. Current Repository State
 
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
-4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection).
+4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
+clothing-specific scan regions.
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4).
@@ -52,7 +53,15 @@ images. **No measurements, size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
 the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
 full height, sets the minimum zoom only when the camera exposes zoom, and the
-preview follows a portrait stream's shape (never cropping head/feet). Scan session state is local to the page (no global state).
+preview follows a portrait stream's shape (never cropping head/feet).
+Scan regions (`utils/pose/scanRegions.ts`): the selected clothing decides the validated region —
+T-shirt/Shirt/Blazer → upper body (face to just below the hips, feet not required),
+Jeans/Trousers → lower body (waist to feet, head not required), nothing selected → full body.
+Each region defines framing bounds, required landmarks, edge points, posture checks, stillness
+points and copy; one shared pipeline (assessPose/usePoseScan) applies it. Orientation votes only
+use cues actually in the camera's view. MediaPipe detects people from the head/upper body, so a
+legs-only frame can't be detected; tracking can continue once detected.
+Scan session state is local to the page (no global state).
 User information and the clothing selection are kept in memory only (not
 persisted); height/weight display units and theme are persisted.
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
@@ -85,8 +94,8 @@ src/
                       frame analysis, pose/poseLandmarker = MediaPipe engine)
   utils/              pure helpers: constants, motion presets, unit conversion,
                       user-info validation, clothing catalog + validation,
-                      scan phases + scan guidance, pose/ (landmarks, orientation,
-                      validation + capture hold, config)
+                      scan phases + scan guidance, scanPreview, pose/ (landmarks, orientation,
+                      validation + capture hold, config, scanRegions = clothing → body region)
   types/domain.ts     domain types (lengths in cm, weight in kg)
   types/scan.ts       scan/camera types (ScanCapture = landmark snapshot)
   types/pose.ts       pose landmark types

@@ -37,6 +37,8 @@ export interface OrientationEstimate {
   confidence: number;
   /** Individual votes (−1…+1) behind frontness and facing, for debugging. */
   signals: Record<string, number>;
+  /** Cues that were in view and could vote. */
+  cues: OrientationCues;
 }
 
 export interface OrientationCalibration {
@@ -44,8 +46,24 @@ export interface OrientationCalibration {
   frontalWidthRatio: number;
 }
 
-/** Typical shoulder-width-to-torso ratio facing the camera, used until the front view calibrates it. */
+/**
+ * Which cues can vote. A cue only counts when its body part is actually in
+ * the camera's view in this frame; `shoulders` also selects the width
+ * measure (shoulders ÷ torso, or hips ÷ thigh when the region has no torso).
+ */
+export interface OrientationCues {
+  face: boolean;
+  shoulders: boolean;
+  feet: boolean;
+}
+
+/**
+ * Typical width ratio facing the camera, used until the front view calibrates
+ * it: shoulder width ÷ torso length, or — when the shoulders are not in view —
+ * hip width ÷ thigh length.
+ */
 export const DEFAULT_FRONTAL_WIDTH_RATIO = 0.65;
+export const DEFAULT_FRONTAL_HIP_RATIO = 0.5;
 
 /** relativeWidth thresholds, with hysteresis toward the previous view so the result doesn't flicker. */
 const FRONTAL_MIN = 0.7;
@@ -77,10 +95,15 @@ const meanVisibility = (pose: PoseLandmark[], indices: readonly number[]): numbe
 
 const FACE = [LM.nose, LM.leftEyeInner, LM.leftEye, LM.leftEyeOuter, LM.rightEyeInner, LM.rightEye, LM.rightEyeOuter, LM.mouthLeft, LM.mouthRight] as const;
 
+/** Votes from body parts outside the camera's view carry no weight. */
+const weightIf = (available: boolean, weight: number): number => (available ? weight : 0);
+
 /**
- * @param px     image landmarks in pixels (unmirrored)
- * @param pose   image landmarks as returned by the model (for visibility)
- * @param world  3D world landmarks in metres
+ * @param px      image landmarks in pixels (unmirrored)
+ * @param pose    image landmarks as returned by the model (for visibility)
+ * @param world   3D world landmarks in metres
+ * @param cues    which body parts are in view and can vote
+ * @param scalePx region reference length in pixels (torso, or thigh-based when the torso is out of view)
  */
 export function estimateOrientation(
   px: Point[],
@@ -88,24 +111,37 @@ export function estimateOrientation(
   world: PoseLandmark[],
   calibration: OrientationCalibration | null,
   previousView: CoarseView | null,
+  cues: OrientationCues = { face: true, shoulders: true, feet: true },
+  scalePx?: number,
 ): OrientationEstimate {
   const shoulderMid = mid(px[LM.leftShoulder], px[LM.rightShoulder]);
   const hipMid = mid(px[LM.leftHip], px[LM.rightHip]);
-  const torso = Math.max(Math.hypot(shoulderMid.x - hipMid.x, shoulderMid.y - hipMid.y), 1);
+  const kneeMid = mid(px[LM.leftKnee], px[LM.rightKnee]);
+  const torso = scalePx ?? Math.max(Math.hypot(shoulderMid.x - hipMid.x, shoulderMid.y - hipMid.y), 1);
+  const thigh = Math.max(Math.hypot(kneeMid.x - hipMid.x, kneeMid.y - hipMid.y), 1);
 
   const shoulderDx = px[LM.leftShoulder].x - px[LM.rightShoulder].x;
   const hipDx = px[LM.leftHip].x - px[LM.rightHip].x;
-  const widthRatio = Math.abs(shoulderDx) / torso;
-  const frontalRatio = calibration?.frontalWidthRatio ?? DEFAULT_FRONTAL_WIDTH_RATIO;
+  // Turning narrows the body: shoulders against the torso, or hips against the thigh when the shoulders are out of view.
+  const widthRatio = cues.shoulders ? Math.abs(shoulderDx) / torso : Math.abs(hipDx) / thigh;
+  const frontalRatio =
+    calibration?.frontalWidthRatio ?? (cues.shoulders ? DEFAULT_FRONTAL_WIDTH_RATIO : DEFAULT_FRONTAL_HIP_RATIO);
   const relativeWidth = widthRatio / frontalRatio;
 
   const frontalMin = previousView === 'frontal' ? FRONTAL_KEEP : FRONTAL_MIN;
   const sideMax = previousView === 'side' ? SIDE_KEEP : SIDE_MAX;
   const view: CoarseView = relativeWidth >= frontalMin ? 'frontal' : relativeWidth <= sideMax ? 'side' : 'turning';
 
-  // 3D torso yaw: angle of the right→left shoulder (and hip) vector in the ground plane.
-  const sx = world[LM.leftShoulder].x - world[LM.rightShoulder].x + 0.5 * (world[LM.leftHip].x - world[LM.rightHip].x);
-  const sz = world[LM.leftShoulder].z - world[LM.rightShoulder].z + 0.5 * (world[LM.leftHip].z - world[LM.rightHip].z);
+  // 3D torso yaw: angle of the right→left shoulder (and hip) vector in the ground plane; hips only when the
+  // shoulders are out of view.
+  const shoulderWeight = cues.shoulders ? 1 : 0;
+  const hipWeight = cues.shoulders ? 0.5 : 1;
+  const sx =
+    shoulderWeight * (world[LM.leftShoulder].x - world[LM.rightShoulder].x) +
+    hipWeight * (world[LM.leftHip].x - world[LM.rightHip].x);
+  const sz =
+    shoulderWeight * (world[LM.leftShoulder].z - world[LM.rightShoulder].z) +
+    hipWeight * (world[LM.leftHip].z - world[LM.rightHip].z);
   const worldYawDeg = (Math.atan2(sz, sx) * 180) / Math.PI;
   const worldLength = Math.hypot(sx, sz) || 1;
 
@@ -126,11 +162,11 @@ export function estimateOrientation(
     worldFront: Math.cos((worldYawDeg * Math.PI) / 180),
   };
   const frontness = combine([
-    { value: signals.shoulderOrder, weight: 0.75 },
+    { value: signals.shoulderOrder, weight: weightIf(cues.shoulders, 0.75) },
     { value: signals.hipOrder, weight: 0.5 },
-    { value: signals.face, weight: 1 },
-    { value: signals.toeDepth, weight: 1 },
-    { value: signals.noseDepth, weight: 1 },
+    { value: signals.face, weight: weightIf(cues.face, 1) },
+    { value: signals.toeDepth, weight: weightIf(cues.feet, 1) },
+    { value: signals.noseDepth, weight: weightIf(cues.face, 1) },
     { value: signals.worldFront, weight: 2 },
   ]);
 
@@ -141,8 +177,8 @@ export function estimateOrientation(
   signals.toeDirection = clamp(toeDx / (0.12 * torso), -1, 1);
   signals.worldSide = clamp(sz / worldLength, -1, 1);
   const facing = combine([
-    { value: signals.noseDirection, weight: 1 },
-    { value: signals.toeDirection, weight: 1 },
+    { value: signals.noseDirection, weight: weightIf(cues.face, 1) },
+    { value: signals.toeDirection, weight: weightIf(cues.feet, 1) },
     { value: signals.worldSide, weight: 0.75 },
   ]);
 
@@ -159,5 +195,5 @@ export function estimateOrientation(
     confidence = Math.abs(facing);
   }
 
-  return { view, orientation, widthRatio, relativeWidth, frontness, facing, worldYawDeg, confidence, signals };
+  return { view, orientation, widthRatio, relativeWidth, frontness, facing, worldYawDeg, confidence, signals, cues };
 }

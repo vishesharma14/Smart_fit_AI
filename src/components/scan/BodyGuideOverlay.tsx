@@ -27,6 +27,8 @@ interface BodyGuideOverlayProps {
    * when the preview is not mirrored (rear camera).
    */
   mirrored: boolean;
+  /** Vertical part of the figure to show for the scanned region (0 = feet, 1 = head top). */
+  range?: [number, number];
 }
 
 /**
@@ -34,7 +36,7 @@ interface BodyGuideOverlayProps {
  * single 3D reference mannequin turned to the current scan angle. It is a
  * fixed illustration — it does not detect, track or represent the user's body.
  */
-export function BodyGuideOverlay({ phase, mirrored }: BodyGuideOverlayProps) {
+export function BodyGuideOverlay({ phase, mirrored, range }: BodyGuideOverlayProps) {
   const phaseLabel = SCAN_PHASES.find((p) => p.id === phase)?.label ?? '';
 
   return (
@@ -42,7 +44,7 @@ export function BodyGuideOverlay({ phase, mirrored }: BodyGuideOverlayProps) {
       <div className="body-guide__vignette" aria-hidden="true" />
 
       <Suspense fallback={null}>
-        <MannequinCanvas yaw={mirrored ? PHASE_YAW[phase] : -PHASE_YAW[phase]} />
+        <MannequinCanvas yaw={mirrored ? PHASE_YAW[phase] : -PHASE_YAW[phase]} range={range} />
       </Suspense>
 
       <svg className="body-guide__frame" viewBox="0 0 300 400" preserveAspectRatio="none" aria-hidden="true">

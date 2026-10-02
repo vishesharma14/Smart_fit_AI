@@ -1,6 +1,7 @@
 import type { PoseEngineStatus } from '../types/pose';
 import type { CameraErrorKind, CameraStatus, FrameQuality, ScanSessionStatus } from '../types/scan';
 import type { BodyPart, PoseAssessment, PoseIssue } from './pose/poseValidation';
+import type { ScanRegionDefinition } from './pose/scanRegions';
 import type { ScanPhaseDefinition } from './scanPhases';
 
 export type GuidanceTone = 'neutral' | 'info' | 'warning' | 'success' | 'error';
@@ -61,11 +62,14 @@ export interface GuidanceInput {
   pose: PoseGuidanceState;
   /** Angle captured a moment ago, for a brief confirmation. */
   justCaptured: ScanPhaseDefinition | null;
+  /** Body region being scanned (from the selected clothing). */
+  scanRegion: ScanRegionDefinition;
 }
 
 const PART_LABEL: Record<BodyPart, string> = {
   head: 'Your head',
   shoulders: 'Your shoulders',
+  elbows: 'Your elbows',
   hips: 'Your hips',
   knees: 'Your knees',
   feet: 'Your feet',
@@ -96,28 +100,37 @@ function orientationGuidance(phase: ScanPhaseDefinition, detected: PoseIssue & {
 }
 
 /** Instruction for the first failed pose check. */
-export function poseIssueGuidance(issue: PoseIssue, phase: ScanPhaseDefinition): ScanGuidance {
+export function poseIssueGuidance(issue: PoseIssue, phase: ScanPhaseDefinition, region: ScanRegionDefinition): ScanGuidance {
   const warn = (title: string, detail: string): ScanGuidance => ({ tone: 'warning', title, detail });
   const tip = (title: string, detail: string): ScanGuidance => ({ tone: 'info', title, detail });
   switch (issue.kind) {
     case 'no-person':
-      return tip('Step into the frame', 'Stand where the camera can see your whole body, from head to feet.');
+      return tip(
+        'Step into the frame',
+        `Stand where the camera can see ${region.framingPhrase}.${region.noPersonHint ? ` ${region.noPersonHint}` : ''}`,
+      );
     case 'multiple-people':
       return warn('Only one person should be in view', "Ask anyone else to step out of the camera's view.");
     case 'too-close':
-      return warn('Move farther away', 'Step back until your whole body, from head to feet, fits inside the frame.');
+      return warn('Move farther away', `Step back until ${region.framingPhrase} fit inside the frame.`);
     case 'too-far':
       return warn('Move closer', 'Step toward the camera so your body fills more of the frame.');
-    case 'head-out':
+    case 'top-out':
       return issue.canTilt
-        ? warn('Tilt the camera up a little', 'There is room below your feet. Aim the camera slightly higher so your head is in view.')
-        : warn('Your head is out of view', 'Step back a little, or tilt the camera up, so your head is inside the frame.');
-    case 'feet-out':
+        ? warn(
+            'Tilt the camera up a little',
+            `There is room below your ${region.bottomPartLabel}. Aim the camera slightly higher to bring your ${region.topPartLabel} into view.`,
+          )
+        : warn(`Bring your ${region.topPartLabel} into view`, 'Step back a little, or tilt the camera up.');
+    case 'bottom-out':
       return issue.canTilt
-        ? warn('Tilt the camera down a little', 'There is room above your head. Aim the camera slightly lower so your feet are in view.')
-        : warn('Your feet are out of view', 'Step back a little, or tilt the camera down, so your feet are inside the frame.');
+        ? warn(
+            'Tilt the camera down a little',
+            `There is room above your ${region.topPartLabel}. Aim the camera slightly lower to bring your ${region.bottomPartLabel} into view.`,
+          )
+        : warn(`Bring your ${region.bottomPartLabel} into view`, 'Step back a little, or tilt the camera down.');
     case 'off-centre':
-      return warn('Move to the centre of the frame', 'Your arms or feet are too close to the edge.');
+      return warn('Move to the centre of the frame', `${region.edgeLabel} are too close to the edge.`);
     case 'body-hidden':
       return warn(
         `${PART_LABEL[issue.part]} ${issue.part === 'head' ? "isn't" : "aren't"} clearly visible`,
@@ -144,7 +157,7 @@ export function poseIssueGuidance(issue: PoseIssue, phase: ScanPhaseDefinition):
  * detected on this device.
  */
 export function deriveScanGuidance(input: GuidanceInput): ScanGuidance {
-  const { cameraStatus, cameraError, sessionStatus, phase, quality, pose, justCaptured } = input;
+  const { cameraStatus, cameraError, sessionStatus, phase, quality, pose, justCaptured, scanRegion } = input;
 
   if (cameraStatus === 'idle') {
     return { tone: 'neutral', title: 'Camera is off', detail: 'Enable your camera to begin the guided scan.' };
@@ -167,8 +180,8 @@ export function deriveScanGuidance(input: GuidanceInput): ScanGuidance {
   if (sessionStatus === 'ready') {
     return {
       tone: 'neutral',
-      title: 'Position yourself inside the frame',
-      detail: 'Stand back so your whole body fits inside the guide, from head to feet. Start the scan when you are ready.',
+      title: `${scanRegion.label}: position yourself`,
+      detail: scanRegion.readyDetail,
     };
   }
   if (sessionStatus === 'paused') {
@@ -205,7 +218,7 @@ export function deriveScanGuidance(input: GuidanceInput): ScanGuidance {
   if (!pose.assessment) {
     return { tone: 'info', title: 'Looking for you…', detail: 'Body detection is starting.' };
   }
-  if (pose.assessment.issue) return poseIssueGuidance(pose.assessment.issue, phase);
+  if (pose.assessment.issue) return poseIssueGuidance(pose.assessment.issue, phase, scanRegion);
   if (pose.moving || quality.moving) {
     return { tone: 'info', title: 'Hold still', detail: `${phase.label} view detected. Keep steady for a moment.` };
   }
