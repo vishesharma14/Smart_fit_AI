@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check, Eye } from 'lucide-react';
+import { Check } from 'lucide-react';
 import type { ScanPhaseId, ScanPhaseStatus } from '../../types/scan';
 import { SCAN_PHASES } from '../../utils/scanPhases';
 import './ScanPhaseProgress.css';
@@ -7,7 +7,6 @@ import './ScanPhaseProgress.css';
 const STATUS_TEXT: Record<ScanPhaseStatus, string> = {
   pending: 'Not started',
   active: 'In progress',
-  previewed: 'Previewed, not captured',
   captured: 'Captured',
 };
 
@@ -15,7 +14,7 @@ interface ScanPhaseProgressProps {
   phases: Record<ScanPhaseId, ScanPhaseStatus>;
 }
 
-/** Ordered list of scan angles with their status (✓ only for angles a detection engine captured). */
+/** Ordered list of scan angles with their status (✓ only for angles the pose model confirmed). */
 export function ScanPhaseProgress({ phases }: ScanPhaseProgressProps) {
   return (
     <ol className="scan-phases" aria-label="Scan angles">
@@ -29,7 +28,6 @@ export function ScanPhaseProgress({ phases }: ScanPhaseProgressProps) {
           >
             <span className="scan-phases__marker" aria-hidden="true">
               {status === 'captured' && <Check size={14} strokeWidth={3} />}
-              {status === 'previewed' && <Eye size={13} strokeWidth={2.25} />}
               {status === 'active' && (
                 <motion.span
                   className="scan-phases__dot"

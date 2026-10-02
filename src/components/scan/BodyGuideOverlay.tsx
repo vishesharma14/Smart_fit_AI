@@ -21,6 +21,12 @@ const PHASE_YAW: Record<ScanPhaseId, number> = {
 interface BodyGuideOverlayProps {
   /** Scan angle the reference figure should demonstrate. */
   phase: ScanPhaseId;
+  /**
+   * Whether the camera preview is mirrored (front camera). The figure turns
+   * the way the user appears to turn on screen, so it turns the other way
+   * when the preview is not mirrored (rear camera).
+   */
+  mirrored: boolean;
 }
 
 /**
@@ -28,7 +34,7 @@ interface BodyGuideOverlayProps {
  * single 3D reference mannequin turned to the current scan angle. It is a
  * fixed illustration — it does not detect, track or represent the user's body.
  */
-export function BodyGuideOverlay({ phase }: BodyGuideOverlayProps) {
+export function BodyGuideOverlay({ phase, mirrored }: BodyGuideOverlayProps) {
   const phaseLabel = SCAN_PHASES.find((p) => p.id === phase)?.label ?? '';
 
   return (
@@ -36,7 +42,7 @@ export function BodyGuideOverlay({ phase }: BodyGuideOverlayProps) {
       <div className="body-guide__vignette" aria-hidden="true" />
 
       <Suspense fallback={null}>
-        <MannequinCanvas yaw={PHASE_YAW[phase]} />
+        <MannequinCanvas yaw={mirrored ? PHASE_YAW[phase] : -PHASE_YAW[phase]} />
       </Suspense>
 
       <svg className="body-guide__frame" viewBox="0 0 300 400" preserveAspectRatio="none" aria-hidden="true">

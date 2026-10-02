@@ -46,11 +46,6 @@
   background: var(--color-primary);
 }
 
-.scan-phases__item--previewed .scan-phases__marker {
-  border-style: dashed;
-  color: var(--color-text-muted);
-}
-
 .scan-phases__item--captured .scan-phases__marker {
   border-color: transparent;
   background: var(--color-success);

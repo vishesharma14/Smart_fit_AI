@@ -1,5 +1,5 @@
-import { useReducer } from 'react';
-import type { ScanPhaseId, ScanPhaseStatus, ScanSessionStatus } from '../types/scan';
+import { useCallback, useReducer } from 'react';
+import type { ScanCapture, ScanPhaseId, ScanPhaseStatus, ScanSessionStatus } from '../types/scan';
 import { SCAN_PHASES } from '../utils/scanPhases';
 
 export interface ScanSessionState {
@@ -7,6 +7,8 @@ export interface ScanSessionState {
   /** Index into SCAN_PHASES of the angle being guided. */
   phaseIndex: number;
   phases: Record<ScanPhaseId, ScanPhaseStatus>;
+  /** Landmark snapshots for captured angles (no images). */
+  captures: Partial<Record<ScanPhaseId, ScanCapture>>;
 }
 
 type ScanSessionAction =
@@ -14,10 +16,8 @@ type ScanSessionAction =
   | { type: 'pause' }
   | { type: 'resume' }
   | { type: 'restart' }
-  /** Detection engine confirmed the current angle. */
-  | { type: 'capture' }
-  /** Move on without capturing (guidance preview only). */
-  | { type: 'preview-next' };
+  /** The pose model confirmed the current angle for the full hold time. */
+  | { type: 'capture'; phase: ScanPhaseId; capture: ScanCapture };
 
 const allPending = (): Record<ScanPhaseId, ScanPhaseStatus> => ({
   front: 'pending',
@@ -26,48 +26,44 @@ const allPending = (): Record<ScanPhaseId, ScanPhaseStatus> => ({
   right: 'pending',
 });
 
-const initialState: ScanSessionState = { status: 'ready', phaseIndex: 0, phases: allPending() };
-
-/** Marks the current angle `done` and activates the next, or finishes after the last. */
-function advance(state: ScanSessionState, done: 'captured' | 'previewed'): ScanSessionState {
-  const current = SCAN_PHASES[state.phaseIndex];
-  const next = SCAN_PHASES[state.phaseIndex + 1];
-  const phases = { ...state.phases, [current.id]: done };
-  if (!next) return { ...state, status: 'finished', phases };
-  return { status: 'scanning', phaseIndex: state.phaseIndex + 1, phases: { ...phases, [next.id]: 'active' } };
-}
+const initialState: ScanSessionState = { status: 'ready', phaseIndex: 0, phases: allPending(), captures: {} };
 
 function reducer(state: ScanSessionState, action: ScanSessionAction): ScanSessionState {
   switch (action.type) {
     case 'start':
       if (state.status !== 'ready') return state;
-      return { status: 'scanning', phaseIndex: 0, phases: { ...allPending(), [SCAN_PHASES[0].id]: 'active' } };
+      return { ...initialState, status: 'scanning', phases: { ...allPending(), [SCAN_PHASES[0].id]: 'active' } };
     case 'pause':
       return state.status === 'scanning' ? { ...state, status: 'paused' } : state;
     case 'resume':
       return state.status === 'paused' ? { ...state, status: 'scanning' } : state;
     case 'restart':
       return initialState;
-    case 'capture':
-      return state.status === 'scanning' ? advance(state, 'captured') : state;
-    case 'preview-next':
-      return state.status === 'scanning' ? advance(state, 'previewed') : state;
+    case 'capture': {
+      const current = SCAN_PHASES[state.phaseIndex];
+      // Ignore a late capture for an angle that is no longer active (e.g. after pause or restart).
+      if (state.status !== 'scanning' || action.phase !== current.id) return state;
+      const next = SCAN_PHASES[state.phaseIndex + 1];
+      const phases = { ...state.phases, [current.id]: 'captured' as const };
+      const captures = { ...state.captures, [current.id]: action.capture };
+      if (!next) return { ...state, status: 'finished', phases, captures };
+      return { status: 'scanning', phaseIndex: state.phaseIndex + 1, phases: { ...phases, [next.id]: 'active' }, captures };
+    }
   }
 }
 
 /** Scan angle sequence (front → left → back → right) and session controls. Local to the scan page. */
 export function useScanSession() {
   const [state, dispatch] = useReducer(reducer, initialState);
-  return {
-    ...state,
-    currentPhase: SCAN_PHASES[state.phaseIndex],
-    start: () => dispatch({ type: 'start' }),
-    pause: () => dispatch({ type: 'pause' }),
-    resume: () => dispatch({ type: 'resume' }),
-    restart: () => dispatch({ type: 'restart' }),
-    capture: () => dispatch({ type: 'capture' }),
-    previewNext: () => dispatch({ type: 'preview-next' }),
-  };
+  const start = useCallback(() => dispatch({ type: 'start' }), []);
+  const pause = useCallback(() => dispatch({ type: 'pause' }), []);
+  const resume = useCallback(() => dispatch({ type: 'resume' }), []);
+  const restart = useCallback(() => dispatch({ type: 'restart' }), []);
+  const capture = useCallback(
+    (phase: ScanPhaseId, snapshot: ScanCapture) => dispatch({ type: 'capture', phase, capture: snapshot }),
+    [],
+  );
+  return { ...state, currentPhase: SCAN_PHASES[state.phaseIndex], start, pause, resume, restart, capture };
 }
 
 export type UseScanSession = ReturnType<typeof useScanSession>;

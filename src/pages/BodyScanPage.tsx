@@ -1,38 +1,79 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ChevronRight, Info, Pause, Play, PowerOff, RotateCcw, ShieldCheck, SwitchCamera } from 'lucide-react';
+import { useSearchParams } from 'react-router';
+import { ArrowLeft, Cpu, Pause, Play, PowerOff, RotateCcw, ShieldCheck, SwitchCamera } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Button } from '../components/Button';
 import { StepProgress } from '../components/StepProgress';
+import { PoseDebugOverlay } from '../components/scan/PoseDebugOverlay';
+import { PoseDebugPanel } from '../components/scan/PoseDebugPanel';
 import { ScanPhaseProgress } from '../components/scan/ScanPhaseProgress';
 import { ScanStatus } from '../components/scan/ScanStatus';
 import { ScanViewport } from '../components/scan/ScanViewport';
 import { useCamera } from '../hooks/useCamera';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useFrameQuality } from '../hooks/useFrameQuality';
+import { usePoseScan, type PoseScanState } from '../hooks/usePoseScan';
 import { useScanSession, type UseScanSession } from '../hooks/useScanSession';
 import { FLOW_TOTAL_STEPS } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
-import { isBodyDetectionAvailable } from '../services/bodyDetection';
 import { useAppStore } from '../store/useAppStore';
 import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { deriveScanGuidance } from '../utils/scanGuidance';
+import { SCAN_PHASES, type ScanPhaseDefinition } from '../utils/scanPhases';
+import type { ScanCapture, ScanPhaseId } from '../types/scan';
 import './BodyScanPage.css';
 
-const ENGINE_NOTE_ID = 'scan-engine-note';
+/** How long the "Front captured" confirmation stays before guidance for the next angle resumes. */
+const CAPTURED_MESSAGE_MS = 1600;
 
-/** Step 3 of the fit flow: camera-guided multi-angle body scan (guidance foundation). */
+/** Step 3 of the fit flow: camera-guided multi-angle body scan with on-device pose detection. */
 export function BodyScanPage() {
   useDocumentTitle(pageTitle('Body scan'));
   const clothing = useAppStore((s) => s.clothingSelection);
   const camera = useCamera();
   const session = useScanSession();
-  const detectionAvailable = isBodyDetectionAvailable();
+  const [searchParams] = useSearchParams();
+  const debug = searchParams.has('poseDebug');
+  // Testing aid: `?poseDebug&poseDelegate=CPU|GPU` forces the inference delegate.
+  const delegateParam = searchParams.get('poseDelegate');
+  const forcedDelegate = debug && (delegateParam === 'CPU' || delegateParam === 'GPU') ? delegateParam : undefined;
 
   const cameraActive = camera.status === 'active';
-  const quality = useFrameQuality(camera.videoRef, cameraActive && session.status === 'scanning');
+  const scanning = cameraActive && session.status === 'scanning';
+  const quality = useFrameQuality(camera.videoRef, scanning);
+
+  // Brief confirmation after each automatic capture.
+  const [justCaptured, setJustCaptured] = useState<ScanPhaseDefinition | null>(null);
+  useEffect(() => {
+    if (!justCaptured) return;
+    const timeout = window.setTimeout(() => setJustCaptured(null), CAPTURED_MESSAGE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [justCaptured]);
+
+  const { capture } = session;
+  const handleCapture = useCallback(
+    (phase: ScanPhaseId, snapshot: ScanCapture) => {
+      capture(phase, snapshot);
+      setJustCaptured(SCAN_PHASES.find((p) => p.id === phase) ?? null);
+    },
+    [capture],
+  );
+
+  // The front view calibrates this person's frontal shoulder width for detecting side views.
+  const frontCapture = session.captures.front;
+  const pose = usePoseScan({
+    videoRef: camera.videoRef,
+    cameraActive,
+    scanning: scanning && !justCaptured,
+    target: session.currentPhase.id,
+    calibration: frontCapture ? { frontalWidthRatio: frontCapture.widthRatio } : null,
+    quality,
+    onCapture: handleCapture,
+    delegate: forcedDelegate,
+  });
 
   // If the camera stops mid-scan (turned off, unplugged, permission revoked), pause instead of carrying on blind.
   const { status: sessionStatus, pause } = session;
@@ -62,9 +103,8 @@ export function BodyScanPage() {
     sessionStatus: session.status,
     phase: session.currentPhase,
     quality,
-    detection: null,
-    detectionAvailable,
-    anyCaptured: Object.values(session.phases).includes('captured'),
+    pose,
+    justCaptured: session.status === 'scanning' ? justCaptured : null,
   });
 
   const clothingLabel = clothing
@@ -101,8 +141,8 @@ export function BodyScanPage() {
             Body <span className="flow-step__title-accent">scan</span>
           </h1>
           <p className="scan-page__lead">
-            Stand back so your whole body is visible, then turn slowly through four angles: front, left side, back and
-            right side.
+            Stand back so your whole body is visible, then turn to your left a quarter turn at a time: front, side, back
+            and other side. Each angle is captured automatically once you hold still.
           </p>
         </motion.section>
 
@@ -111,6 +151,17 @@ export function BodyScanPage() {
             camera={camera}
             phaseLabel={showPhaseOnPreview ? session.currentPhase.label : null}
             guidePhase={session.currentPhase.id}
+            overlay={
+              debug && (
+                <PoseDebugOverlay
+                  landmarks={pose.assessment?.landmarks ?? null}
+                  videoWidth={camera.videoRef.current?.videoWidth ?? 0}
+                  videoHeight={camera.videoRef.current?.videoHeight ?? 0}
+                  mirrored={camera.facingMode === 'user'}
+                  valid={pose.assessment?.issue === null}
+                />
+              )
+            }
           />
           {cameraActive && (
             <div className="scan-page__camera-actions">
@@ -136,31 +187,25 @@ export function BodyScanPage() {
         >
           <ScanStatus guidance={guidance} />
 
-          {!detectionAvailable && (
-            <p id={ENGINE_NOTE_ID} className="scan-page__engine-note">
-              <Info aria-hidden="true" size={16} strokeWidth={2} />
-              <span>
-                <strong>Scan guidance preview.</strong> Body detection engine not connected yet. Lighting and movement
-                checks are live, but body position and angles are not verified, so no angle can be captured and no
-                measurements are taken.
-              </span>
-            </p>
-          )}
+          {cameraActive && <PoseEngineNote pose={pose} />}
 
           <div className="scan-page__phases">
             <h2 className="scan-page__subheading">Scan angles</h2>
             <ScanPhaseProgress phases={session.phases} />
           </div>
 
-          {cameraActive && <ScanControls session={session} previewMode={!detectionAvailable} />}
+          {cameraActive && <ScanControls session={session} />}
+
+          {debug && cameraActive && <PoseDebugPanel pose={pose} />}
         </motion.section>
 
         <motion.p className="scan-page__privacy" variants={fadeUpItem}>
           <ShieldCheck className="scan-page__privacy-icon" aria-hidden="true" size={20} strokeWidth={1.75} />
           <span>
-            <strong>Your camera is used for body scanning.</strong> In this version the video is only checked on this
-            device for lighting and movement; no measurements are estimated yet. Raw camera data is not intentionally
-            stored or uploaded by this interface, and the camera turns off when you leave this page.
+            <strong>Your camera is used for body scanning.</strong> The video is analysed on this device only: for
+            lighting, movement and your body pose (joint positions). Video frames are not uploaded or saved; only the
+            detected joint positions for each angle are kept in memory on this page. No measurements are estimated yet,
+            and the camera turns off when you leave this page.
           </span>
         </motion.p>
       </motion.div>
@@ -170,15 +215,13 @@ export function BodyScanPage() {
 
 interface ScanControlsProps {
   session: UseScanSession;
-  /** No detection engine: allow stepping through angles as an explicit, uncaptured preview. */
-  previewMode: boolean;
 }
 
 /**
  * Start / Pause / Resume share one primary button so keyboard focus stays in
- * place as the scan changes state. Other controls appear only when relevant.
+ * place as the scan changes state. Angles are captured automatically.
  */
-function ScanControls({ session, previewMode }: ScanControlsProps) {
+function ScanControls({ session }: ScanControlsProps) {
   const { status } = session;
   const primary =
     status === 'ready'
@@ -189,7 +232,6 @@ function ScanControls({ session, previewMode }: ScanControlsProps) {
           ? { label: 'Resume scan', icon: Play, onClick: session.resume, variant: 'primary' as const }
           : { label: 'Restart scan', icon: RotateCcw, onClick: session.restart, variant: 'primary' as const };
   const PrimaryIcon = primary.icon;
-  const isLastPhase = session.phaseIndex === 3;
 
   return (
     <div className="scan-page__controls">
@@ -197,13 +239,6 @@ function ScanControls({ session, previewMode }: ScanControlsProps) {
         <PrimaryIcon aria-hidden="true" size={20} />
         {primary.label}
       </Button>
-
-      {previewMode && status === 'scanning' && (
-        <Button variant="secondary" size="lg" onClick={session.previewNext} aria-describedby={ENGINE_NOTE_ID}>
-          {isLastPhase ? 'Finish preview' : 'Preview next angle'}
-          <ChevronRight aria-hidden="true" size={20} />
-        </Button>
-      )}
 
       {(status === 'scanning' || status === 'paused') && (
         <Button variant="secondary" size="lg" onClick={session.restart}>
@@ -216,5 +251,33 @@ function ScanControls({ session, previewMode }: ScanControlsProps) {
         <p className="scan-page__next-note">Measurements are the next step and are not available yet.</p>
       )}
     </div>
+  );
+}
+
+/** States what the detection engine is doing, and offers a retry if the model failed to load. */
+function PoseEngineNote({ pose }: { pose: PoseScanState }) {
+  if (pose.status === 'error') {
+    return (
+      <div className="scan-page__engine-note scan-page__engine-note--error">
+        <Cpu aria-hidden="true" size={16} strokeWidth={2} />
+        <span>
+          <strong>Pose detection unavailable.</strong> The on-device pose model could not be loaded, so angles cannot be
+          captured.{' '}
+          <button type="button" className="scan-page__text-button" onClick={pose.retry}>
+            Try again
+          </button>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <p className="scan-page__engine-note">
+      <Cpu aria-hidden="true" size={16} strokeWidth={2} />
+      <span>
+        <strong>{pose.status === 'ready' ? 'On-device pose detection active.' : 'Loading on-device pose detection…'}</strong>{' '}
+        Your body position and angle are checked from detected joint positions, and each angle is captured only when the
+        pose is confirmed. Measurements are not estimated yet.
+      </span>
+    </p>
   );
 }

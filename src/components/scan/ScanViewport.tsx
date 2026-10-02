@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, CameraOff, LoaderCircle } from 'lucide-react';
 import type { UseCamera } from '../../hooks/useCamera';
@@ -13,20 +14,23 @@ interface ScanViewportProps {
   phaseLabel: string | null;
   /** Scan angle the reference mannequin demonstrates. */
   guidePhase: ScanPhaseId;
+  /** Optional layer drawn over the live preview (e.g. the pose debug skeleton). */
+  overlay?: ReactNode;
 }
 
 /** Large camera preview with the body guide overlay, plus the camera-off / loading / error states. */
-export function ScanViewport({ camera, phaseLabel, guidePhase }: ScanViewportProps) {
+export function ScanViewport({ camera, phaseLabel, guidePhase, overlay }: ScanViewportProps) {
   const { status, error, facingMode, videoRef, start } = camera;
   const active = status === 'active';
   const canRetry = error !== 'unsupported' && error !== 'insecure-context';
+  const mirrored = facingMode === 'user';
 
   return (
     <div className="scan-viewport" data-camera={status}>
       {/* Kept mounted so the stream can attach as soon as it is ready. */}
       <video
         ref={videoRef}
-        className={['scan-viewport__video', facingMode === 'user' ? 'scan-viewport__video--mirrored' : ''].join(' ')}
+        className={['scan-viewport__video', mirrored ? 'scan-viewport__video--mirrored' : ''].join(' ')}
         playsInline
         muted
         autoPlay
@@ -34,7 +38,8 @@ export function ScanViewport({ camera, phaseLabel, guidePhase }: ScanViewportPro
         hidden={!active}
       />
 
-      {active && <BodyGuideOverlay phase={guidePhase} />}
+      {active && <BodyGuideOverlay phase={guidePhase} mirrored={mirrored} />}
+      {active && overlay}
 
       <AnimatePresence>
         {active && phaseLabel && (

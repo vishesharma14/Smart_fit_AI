@@ -133,7 +133,23 @@
 .scan-page__engine-note svg {
   flex-shrink: 0;
   margin-top: 0.2em;
-  color: var(--color-warning);
+  color: var(--color-secondary);
+}
+
+.scan-page__engine-note--error svg {
+  color: var(--color-danger);
+}
+
+.scan-page__text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .scan-page__phases {

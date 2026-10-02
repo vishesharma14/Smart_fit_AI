@@ -35,16 +35,22 @@ current step explicitly asks for it.**
 ## 2. Current Repository State
 
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
-4 (Clothing Selection), 5 (Body Scan foundation).
+4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4).
 
 Body Scan status: real camera (getUserMedia, video only) with on-device lighting
-and movement checks. **No body/pose detection engine is connected**
-(`services/bodyDetection.ts` exports `bodyDetector = null`), so the page runs as a
-labelled "scan guidance preview": angles can only be *previewed*, never *captured*,
-and no measurements exist. Scan session state is local to the page (no global state).
+and movement checks plus **MediaPipe Pose Landmarker (Full model)** running on-device
+(`@mediapipe/tasks-vision`; model in `public/models/`, wasm bundled — no CDN, no
+upload). Per frame: one person, framing/distance, joint visibility, orientation
+(front / turned left / back / turned right, from several voting signals),
+upright, arms and stance, stillness. An angle is auto-captured only after the pose
+stays valid for `captureHoldMs` (1.5 s) and `captureMinFrames` consecutive frames
+(`utils/pose/poseConfig.ts`); the capture keeps averaged landmarks only, never
+images. **No measurements, size prediction or size charts exist yet.**
+`?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
+the delegate). Scan session state is local to the page (no global state).
 User information and the clothing selection are kept in memory only (not
 persisted); height/weight display units and theme are persisted.
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
@@ -61,7 +67,8 @@ src/
   components/form/    form primitives (FormField, FormCard, TextInput, SegmentedControl, ChoiceCards)
   components/icons/   custom Lucide-style icons (clothing)
   components/scan/    ScanViewport (camera + states), BodyGuideOverlay (scan frame + one 3D
-                      reference mannequin), ScanStatus, ScanPhaseProgress
+                      reference mannequin), ScanStatus (+ capture progress), ScanPhaseProgress,
+                      PoseDebugOverlay / PoseDebugPanel (?poseDebug only)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
@@ -71,14 +78,16 @@ src/
   store/              Zustand store (useAppStore) composed from slices/
                       (user, fit, settings); only display units/theme are persisted
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
-                      useCamera, useFrameQuality, useScanSession)
+                      useCamera, useFrameQuality, useScanSession, usePoseScan)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
-                      frame analysis, body detection contract)
+                      frame analysis, pose/poseLandmarker = MediaPipe engine)
   utils/              pure helpers: constants, motion presets, unit conversion,
                       user-info validation, clothing catalog + validation,
-                      scan phases + scan guidance
+                      scan phases + scan guidance, pose/ (landmarks, orientation,
+                      validation + capture hold, config)
   types/domain.ts     domain types (lengths in cm, weight in kg)
-  types/scan.ts       scan/camera types
+  types/scan.ts       scan/camera types (ScanCapture = landmark snapshot)
+  types/pose.ts       pose landmark types
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 
@@ -99,6 +108,7 @@ Intended stack:
 - Custom CSS (no UI framework unless explicitly approved)
 - Lucide React (icons)
 - Three.js (only for the 3D reference mannequin on the Body Scan page; lazy-loaded)
+- @mediapipe/tasks-vision (on-device pose detection on the Body Scan page; lazy-loaded)
 
 If the repository already contains a working setup, use the existing project choices
 unless there is a strong technical reason to change them. Explain any such reason
