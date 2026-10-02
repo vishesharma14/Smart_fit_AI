@@ -109,8 +109,12 @@ const FLOOR_VERTEX = /* glsl */ `
 
 /** Lens and framing: a slightly long lens (less distortion) looking a little down at the figure. */
 const FOV = 24;
-/** Fraction of the view height the figure occupies, leaving room for the frame and labels. */
-const FILL = 0.74;
+/**
+ * Fraction of the view height the figure occupies, leaving room for the frame
+ * and labels. Close to the size a person can fill while staying fully in view,
+ * so the guide doesn't suggest standing farther away than needed.
+ */
+const FILL = 0.82;
 const CAMERA_LIFT = 0.55;
 
 export function isWebGLAvailable(): boolean {

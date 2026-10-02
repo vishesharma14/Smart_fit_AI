@@ -14,9 +14,13 @@ export const POSE_SCAN_CONFIG = {
   /** A landmark counts as seen when the model's visibility score reaches this. */
   minVisibility: 0.5,
 
-  /** Body height (estimated head top to feet) as a share of the visible preview height. */
+  /**
+   * Body height (estimated head top to feet) as a share of the visible preview height.
+   * The head and feet must separately sit inside the preview's margins, so the
+   * upper limit only needs to leave room for those margins.
+   */
   minBodyHeight: 0.5,
-  maxBodyHeight: 0.92,
+  maxBodyHeight: 0.95,
   /** Safety margins inside the visible preview, as a share of its height / width. */
   verticalMargin: 0.015,
   horizontalMargin: 0.02,

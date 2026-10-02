@@ -91,7 +91,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  width: min(100%, 30rem);
+  /* Narrow enough that the whole preview fits on screen, whatever its shape */
+  width: min(100%, 30rem, calc((100dvh - 6rem) * var(--preview-aspect, 0.75)));
   justify-self: center;
 }
 
@@ -248,8 +249,8 @@
   .scan-page__stage {
     position: sticky;
     top: var(--space-6);
-    /* Keep the whole 3:4 preview on screen */
-    width: min(100%, calc((100dvh - 10rem) * 0.75), 34rem);
+    /* Keep the whole preview on screen */
+    width: min(100%, calc((100dvh - 10rem) * var(--preview-aspect, 0.75)), 34rem);
   }
 
   .scan-page__controls {

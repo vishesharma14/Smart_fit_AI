@@ -109,9 +109,13 @@ export function poseIssueGuidance(issue: PoseIssue, phase: ScanPhaseDefinition):
     case 'too-far':
       return warn('Move closer', 'Step toward the camera so your body fills more of the frame.');
     case 'head-out':
-      return warn('Your head is out of view', 'Step back a little, or tilt the camera up, so your head is inside the frame.');
+      return issue.canTilt
+        ? warn('Tilt the camera up a little', 'There is room below your feet. Aim the camera slightly higher so your head is in view.')
+        : warn('Your head is out of view', 'Step back a little, or tilt the camera up, so your head is inside the frame.');
     case 'feet-out':
-      return warn('Your feet are out of view', 'Step back a little, or tilt the camera down, so your feet are inside the frame.');
+      return issue.canTilt
+        ? warn('Tilt the camera down a little', 'There is room above your head. Aim the camera slightly lower so your feet are in view.')
+        : warn('Your feet are out of view', 'Step back a little, or tilt the camera down, so your feet are inside the frame.');
     case 'off-centre':
       return warn('Move to the centre of the frame', 'Your arms or feet are too close to the edge.');
     case 'body-hidden':

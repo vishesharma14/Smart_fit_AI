@@ -18,8 +18,9 @@ export type PoseIssue =
   | { kind: 'multiple-people' }
   | { kind: 'too-close' }
   | { kind: 'too-far' }
-  | { kind: 'head-out' }
-  | { kind: 'feet-out' }
+  /** `canTilt`: the whole body would fit by tilting the camera instead of stepping back. */
+  | { kind: 'head-out'; canTilt: boolean }
+  | { kind: 'feet-out'; canTilt: boolean }
   | { kind: 'off-centre' }
   | { kind: 'body-hidden'; part: BodyPart }
   | { kind: 'wrong-orientation'; detected: ScanPhaseId | null }
@@ -232,7 +233,9 @@ export function assessPose({
   const feetOut = feetBottom > top + visibleHeight * (1 - config.verticalMargin);
   if (headOut || feetOut) {
     if ((headOut && feetOut) || bodyHeight > config.maxBodyHeight) return fail({ kind: 'too-close' });
-    return fail({ kind: headOut ? 'head-out' : 'feet-out' });
+    // The body is small enough to fit, just shifted: aiming the camera fixes it without moving back.
+    const canTilt = bodyHeight <= 1 - 2 * config.verticalMargin;
+    return fail({ kind: headOut ? 'head-out' : 'feet-out', canTilt });
   }
 
   // 3. Distance from the camera, from the body's share of the preview height.

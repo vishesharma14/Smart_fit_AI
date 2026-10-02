@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router';
 import { ArrowLeft, Cpu, Pause, Play, PowerOff, RotateCcw, ShieldCheck, SwitchCamera } from 'lucide-react';
@@ -22,12 +22,13 @@ import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { deriveScanGuidance } from '../utils/scanGuidance';
+import { previewAspectRatio } from '../utils/scanPreview';
 import { SCAN_PHASES, type ScanPhaseDefinition } from '../utils/scanPhases';
 import type { ScanCapture, ScanPhaseId } from '../types/scan';
 import './BodyScanPage.css';
 
 /** How long the "Front captured" confirmation stays before guidance for the next angle resumes. */
-const CAPTURED_MESSAGE_MS = 1600;
+const CAPTURED_MESSAGE_MS = 1000;
 
 /** Step 3 of the fit flow: camera-guided multi-angle body scan with on-device pose detection. */
 export function BodyScanPage() {
@@ -146,7 +147,12 @@ export function BodyScanPage() {
           </p>
         </motion.section>
 
-        <motion.div ref={stageRef} className="scan-page__stage" variants={fadeUpItem}>
+        <motion.div
+          ref={stageRef}
+          className="scan-page__stage"
+          variants={fadeUpItem}
+          style={{ '--preview-aspect': previewAspectRatio(camera.videoSize) } as CSSProperties}
+        >
           <ScanViewport
             camera={camera}
             phaseLabel={showPhaseOnPreview ? session.currentPhase.label : null}
@@ -196,7 +202,7 @@ export function BodyScanPage() {
 
           {cameraActive && <ScanControls session={session} />}
 
-          {debug && cameraActive && <PoseDebugPanel pose={pose} />}
+          {debug && cameraActive && <PoseDebugPanel pose={pose} camera={camera} />}
         </motion.section>
 
         <motion.p className="scan-page__privacy" variants={fadeUpItem}>

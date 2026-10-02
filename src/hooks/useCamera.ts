@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
+  applyWidestZoom,
   cameraUnavailableReason,
   countVideoInputs,
   requestCameraStream,
   stopCameraStream,
   toCameraErrorKind,
+  type CameraZoom,
 } from '../services/camera';
 import type { CameraErrorKind, CameraStatus, FacingMode } from '../types/scan';
 
@@ -16,6 +18,10 @@ export interface UseCamera {
   facingMode: FacingMode;
   /** True when the device reports more than one camera. */
   canSwitch: boolean;
+  /** Size of the frames the camera actually delivers, once known. */
+  videoSize: { width: number; height: number } | null;
+  /** Zoom control reported by the camera (null until the camera starts). */
+  zoom: CameraZoom | null;
   /** Requests permission (if needed) and starts the preview. Also used for retry. */
   start: () => void;
   /** Stops the stream and turns the camera off. */
@@ -38,6 +44,8 @@ export function useCamera(): UseCamera {
   const [error, setError] = useState<CameraErrorKind | null>(null);
   const [facingMode, setFacingMode] = useState<FacingMode>('user');
   const [canSwitch, setCanSwitch] = useState(false);
+  const [videoSize, setVideoSize] = useState<{ width: number; height: number } | null>(null);
+  const [zoom, setZoom] = useState<CameraZoom | null>(null);
 
   const release = useCallback(() => {
     stopCameraStream(streamRef.current);
@@ -75,6 +83,9 @@ export function useCamera(): UseCamera {
         });
         setFacingMode(mode);
         setStatus('active');
+        const track = stream.getVideoTracks()[0];
+        const zoomInfo = track ? await applyWidestZoom(track) : { supported: false };
+        if (requestId === requestIdRef.current) setZoom(zoomInfo);
         const cameras = await countVideoInputs();
         if (requestId === requestIdRef.current) setCanSwitch(cameras > 1);
       } catch (err) {
@@ -111,6 +122,17 @@ export function useCamera(): UseCamera {
     });
   }, [status, facingMode]);
 
+  // Track the delivered frame size (it can change, e.g. when a phone rotates).
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const update = () =>
+      setVideoSize(video.videoWidth && video.videoHeight ? { width: video.videoWidth, height: video.videoHeight } : null);
+    const events = ['loadedmetadata', 'resize', 'emptied'] as const;
+    events.forEach((name) => video.addEventListener(name, update));
+    return () => events.forEach((name) => video.removeEventListener(name, update));
+  }, []);
+
   // Always turn the camera off when leaving the page.
   useEffect(
     () => () => {
@@ -121,5 +143,5 @@ export function useCamera(): UseCamera {
     [],
   );
 
-  return { videoRef, status, error, facingMode, canSwitch, start, stop, switchCamera };
+  return { videoRef, status, error, facingMode, canSwitch, videoSize, zoom, start, stop, switchCamera };
 }

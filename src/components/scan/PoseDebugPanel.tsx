@@ -1,3 +1,4 @@
+import type { UseCamera } from '../../hooks/useCamera';
 import type { PoseScanState } from '../../hooks/usePoseScan';
 import { POSE_MODEL_NAME } from '../../services/pose/poseLandmarker';
 import './PoseDebugPanel.css';
@@ -6,11 +7,18 @@ const fixed = (value: number | null | undefined, digits = 2) =>
   value === null || value === undefined || Number.isNaN(value) ? '–' : value.toFixed(digits);
 
 /** Developer readout (enabled with `?poseDebug`) of the live detection values behind the guidance. */
-export function PoseDebugPanel({ pose }: { pose: PoseScanState }) {
+export function PoseDebugPanel({ pose, camera }: { pose: PoseScanState; camera: UseCamera }) {
   const { assessment, stats } = pose;
   const orientation = assessment?.orientation;
   const metrics = assessment?.metrics;
+  const { videoSize, zoom } = camera;
   const rows: [string, string][] = [
+    [
+      'Camera',
+      `${videoSize ? `${videoSize.width}×${videoSize.height}` : '–'} · zoom ${
+        !zoom ? '–' : zoom.supported ? `${zoom.value ?? '?'} (range ${zoom.min}–${zoom.max})` : 'not exposed'
+      }`,
+    ],
     ['Model', `${POSE_MODEL_NAME} · ${pose.delegate ?? '–'} · ${pose.status}`],
     ['Inference', stats ? `${fixed(stats.inferenceMs, 1)} ms · ${stats.detectionsPerSecond}/s` : '–'],
     ['People', String(assessment?.people ?? '–')],

@@ -50,7 +50,9 @@ stays valid for `captureHoldMs` (1.5 s) and `captureMinFrames` consecutive frame
 (`utils/pose/poseConfig.ts`); the capture keeps averaged landmarks only, never
 images. **No measurements, size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
-the delegate). Scan session state is local to the page (no global state).
+the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
+full height, sets the minimum zoom only when the camera exposes zoom, and the
+preview follows a portrait stream's shape (never cropping head/feet). Scan session state is local to the page (no global state).
 User information and the clothing selection are kept in memory only (not
 persisted); height/weight display units and theme are persisted.
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
