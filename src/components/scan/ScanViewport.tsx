@@ -5,7 +5,9 @@ import type { UseCamera } from '../../hooks/useCamera';
 import type { ScanPhaseId } from '../../types/scan';
 import { CAMERA_ERROR_COPY } from '../../utils/scanGuidance';
 import { Button } from '../Button';
+import type { ScanGuidance } from '../../utils/scanGuidance';
 import { BodyGuideOverlay } from './BodyGuideOverlay';
+import { ScanInstruction } from './ScanInstruction';
 import './ScanViewport.css';
 
 interface ScanViewportProps {
@@ -18,10 +20,12 @@ interface ScanViewportProps {
   guideRange?: [number, number];
   /** Optional layer drawn over the live preview (e.g. the pose debug skeleton). */
   overlay?: ReactNode;
+  /** Primary instruction shown large over the preview while scanning. */
+  instruction?: ScanGuidance | null;
 }
 
 /** Large camera preview with the body guide overlay, plus the camera-off / loading / error states. */
-export function ScanViewport({ camera, phaseLabel, guidePhase, guideRange, overlay }: ScanViewportProps) {
+export function ScanViewport({ camera, phaseLabel, guidePhase, guideRange, overlay, instruction }: ScanViewportProps) {
   const { status, error, facingMode, videoRef, start } = camera;
   const active = status === 'active';
   const canRetry = error !== 'unsupported' && error !== 'insecure-context';
@@ -42,6 +46,7 @@ export function ScanViewport({ camera, phaseLabel, guidePhase, guideRange, overl
 
       {active && <BodyGuideOverlay phase={guidePhase} mirrored={mirrored} range={guideRange} />}
       {active && overlay}
+      {active && instruction && <ScanInstruction guidance={instruction} />}
 
       <AnimatePresence>
         {active && phaseLabel && (

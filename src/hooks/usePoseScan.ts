@@ -135,6 +135,13 @@ export function usePoseScan({
 
   const calibrationRatio = calibration?.frontalWidthRatio ?? null;
 
+  // Recent landmark positions for the stillness check. They describe how the body is moving, not which angle
+  // is targeted, so they carry over when the target angle changes; they are dropped when scanning stops.
+  const stillnessRef = useRef<StillnessSample[]>([]);
+  useEffect(() => {
+    if (!scanning || !engine) stillnessRef.current = [];
+  }, [scanning, engine]);
+
   // Detection loop: throttled requestAnimationFrame, one model run per interval at most.
   useEffect(() => {
     if (!engine || !scanning) return;
@@ -151,7 +158,7 @@ export function usePoseScan({
     // twice and no later (e.g. turning) frame can reach the saved data.
     let captured = false;
     let previousView: CoarseView | null = null;
-    const stillness: StillnessSample[] = [];
+    const stillness = stillnessRef.current;
     const timings: number[] = [];
     const runTimes: number[] = [];
 
@@ -257,7 +264,6 @@ export function usePoseScan({
     return () => {
       cancelAnimationFrame(frameId);
       holdSamples = [];
-      stillness.length = 0;
       // Never show a stale result after pausing or moving to the next angle.
       setLive(IDLE_LIVE);
     };

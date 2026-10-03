@@ -12,7 +12,29 @@ export interface ScanGuidance {
   detail: string;
   /** 0–1 auto-capture progress, shown while a valid pose is being held. */
   progress?: number;
+  /**
+   * Short sentence for optional voice guidance, the same instruction as the
+   * title. Absent for status messages that don't need to be spoken.
+   */
+  speech?: string;
+  /** Speak immediately, even over the current sentence (angle captured / scan complete). */
+  speechPriority?: boolean;
+  /** False when repeating the sentence later would not help (e.g. "Hold still" during a hold). */
+  speechRepeat?: boolean;
+  /** Instruction already contained in `speech`, so it isn't spoken again straight after. */
+  speechCovers?: string;
 }
+
+/** Spoken angle names: "Front scan complete." */
+const SPOKEN_PHASE: Record<ScanPhaseDefinition['id'], string> = {
+  front: 'Front',
+  left: 'Left',
+  back: 'Back',
+  right: 'Right',
+};
+
+/** Adds the spoken form of an actionable instruction (its title as a sentence). */
+const spoken = (guidance: ScanGuidance): ScanGuidance => ({ ...guidance, speech: `${guidance.title}.` });
 
 export const CAMERA_ERROR_COPY: Record<CameraErrorKind, { title: string; detail: string }> = {
   'permission-denied': {
@@ -112,9 +134,9 @@ export function poseIssueGuidance(issue: PoseIssue, phase: ScanPhaseDefinition, 
     case 'multiple-people':
       return warn('Only one person should be in view', "Ask anyone else to step out of the camera's view.");
     case 'too-close':
-      return warn('Move farther away', `Step back until ${region.framingPhrase} fit inside the frame.`);
+      return warn('Move a little farther back', `Step back until ${region.framingPhrase} fit inside the frame.`);
     case 'too-far':
-      return warn('Move closer', 'Step toward the camera so your body fills more of the frame.');
+      return warn('Move slightly closer', 'Step toward the camera so your body fills more of the frame.');
     case 'top-out':
       return issue.canTilt
         ? warn(
@@ -130,7 +152,10 @@ export function poseIssueGuidance(issue: PoseIssue, phase: ScanPhaseDefinition, 
           )
         : warn(`Bring your ${region.bottomPartLabel} into view`, 'Step back a little, or tilt the camera down.');
     case 'off-centre':
-      return warn('Move to the centre of the frame', `${region.edgeLabel} are too close to the edge.`);
+      return warn(
+        issue.step ? `Move a little to your ${issue.step}` : 'Move to the centre of the frame',
+        `${region.edgeLabel} are too close to the edge.`,
+      );
     case 'body-hidden':
       return warn(
         `${PART_LABEL[issue.part]} ${issue.part === 'head' ? "isn't" : "aren't"} clearly visible`,
@@ -139,7 +164,7 @@ export function poseIssueGuidance(issue: PoseIssue, phase: ScanPhaseDefinition, 
     case 'wrong-orientation':
       return orientationGuidance(phase, issue);
     case 'not-upright':
-      return tip('Stand up straight', 'Keep your body upright and the camera level.');
+      return tip('Stand straight', 'Keep your body upright and the camera level.');
     case 'arms-down':
       return tip('Move your arms slightly away from your body', 'Leave a small gap between your arms and your sides.');
     case 'arms-raised':
@@ -192,12 +217,21 @@ export function deriveScanGuidance(input: GuidanceInput): ScanGuidance {
       tone: 'success',
       title: 'All four angles captured',
       detail: 'Each angle was confirmed from your body pose on this device. Measurements are not estimated yet.',
+      speech: `${SPOKEN_PHASE[phase.id]} scan complete. Scan complete.`,
+      speechPriority: true,
     };
   }
 
   // Scanning.
   if (justCaptured) {
-    return { tone: 'success', title: `${justCaptured.label} captured ✓`, detail: `Next: ${phase.instruction.toLowerCase()}.` };
+    return {
+      tone: 'success',
+      title: `${justCaptured.label} captured ✓`,
+      detail: `Next: ${phase.instruction.toLowerCase()}.`,
+      speech: `${SPOKEN_PHASE[justCaptured.id]} scan complete. ${phase.instruction}.`,
+      speechPriority: true,
+      speechCovers: `${phase.instruction}.`,
+    };
   }
   if (pose.status !== 'ready') {
     return { tone: 'info', title: 'Starting pose detection…', detail: 'Loading the on-device pose model.' };
@@ -206,26 +240,32 @@ export function deriveScanGuidance(input: GuidanceInput): ScanGuidance {
     return { tone: 'info', title: 'Checking camera feed…', detail: 'Analysing lighting and movement.' };
   }
   if (quality.brightness === 'too-dark') {
-    return { tone: 'warning', title: 'It is too dark', detail: 'Move to a brighter spot or turn on a light in front of you.' };
+    return spoken({ tone: 'warning', title: 'It is too dark', detail: 'Move to a brighter spot or turn on a light in front of you.' });
   }
   if (quality.brightness === 'too-bright') {
-    return {
+    return spoken({
       tone: 'warning',
       title: 'The image is too bright',
       detail: 'Avoid standing in front of a window or a bright lamp.',
-    };
+    });
   }
   if (!pose.assessment) {
     return { tone: 'info', title: 'Looking for you…', detail: 'Body detection is starting.' };
   }
-  if (pose.assessment.issue) return poseIssueGuidance(pose.assessment.issue, phase, scanRegion);
+  if (pose.assessment.issue) return spoken(poseIssueGuidance(pose.assessment.issue, phase, scanRegion));
   if (pose.moving || quality.moving) {
-    return { tone: 'info', title: 'Hold still', detail: `${phase.label} view detected. Keep steady for a moment.` };
+    return {
+      ...spoken({ tone: 'info', title: 'Hold still', detail: `${phase.label} view detected. Keep steady for a moment.` }),
+      speechRepeat: false,
+    };
   }
   return {
     tone: 'success',
     title: `Hold still — capturing ${phase.label.toLowerCase()}`,
     detail: 'Keep this pose for a moment.',
     progress: pose.holdProgress,
+    // Same sentence as "Hold still", so it is not repeated as the hold starts.
+    speech: 'Hold still.',
+    speechRepeat: false,
   };
 }

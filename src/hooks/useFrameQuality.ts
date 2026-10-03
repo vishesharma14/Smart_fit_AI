@@ -9,7 +9,14 @@ import {
 } from '../services/frameAnalysis';
 import type { BrightnessLevel, FrameQuality } from '../types/scan';
 
-const SAMPLE_INTERVAL_MS = 250;
+/**
+ * Samples are taken every 125 ms, but movement compares frames 250 ms apart
+ * (two samples back), so movement is measured over the same interval as
+ * before — same sensitivity, same thresholds — while the result updates twice
+ * as often.
+ */
+const SAMPLE_INTERVAL_MS = 125;
+const COMPARE_SAMPLES_BACK = 2;
 /** Smoothing so a single odd frame doesn't flip the guidance. */
 const LUMA_SMOOTHING = 0.35;
 const MOTION_SMOOTHING = 0.5;
@@ -37,7 +44,8 @@ export function useFrameQuality(videoRef: RefObject<HTMLVideoElement | null>, en
     const sampler = createFrameSampler();
     if (!sampler) return;
 
-    let previous: Uint8ClampedArray | null = null;
+    // Only the last couple of tiny grayscale samples are kept, for the movement comparison.
+    let previous: Uint8ClampedArray[] = [];
     lumaRef.current = null;
     motionRef.current = 0;
     movingRef.current = false;
@@ -51,14 +59,13 @@ export function useFrameQuality(videoRef: RefObject<HTMLVideoElement | null>, en
       const luma = averageLuma(gray);
       lumaRef.current = lumaRef.current === null ? luma : lumaRef.current + LUMA_SMOOTHING * (luma - lumaRef.current);
 
-      if (previous) {
-        const diff = meanAbsoluteDifference(previous, gray);
+      if (previous.length >= COMPARE_SAMPLES_BACK) {
+        const diff = meanAbsoluteDifference(previous[0], gray);
         motionRef.current += MOTION_SMOOTHING * (diff - motionRef.current);
         const limit = movingRef.current ? MOTION_THRESHOLD * STILL_HYSTERESIS : MOTION_THRESHOLD;
         movingRef.current = motionRef.current > limit;
       }
-      // Keep only the previous tiny grayscale sample for the movement comparison.
-      previous = gray;
+      previous = [...previous, gray].slice(-COMPARE_SAMPLES_BACK);
 
       const next: FrameQuality = { brightness: classifyBrightness(lumaRef.current), moving: movingRef.current };
       setQuality((current) =>
@@ -69,7 +76,7 @@ export function useFrameQuality(videoRef: RefObject<HTMLVideoElement | null>, en
     const interval = window.setInterval(tick, SAMPLE_INTERVAL_MS);
     return () => {
       window.clearInterval(interval);
-      previous = null;
+      previous = [];
       // Drop the last reading so a paused/resumed scan never shows stale guidance.
       setQuality(null);
     };

@@ -10,7 +10,7 @@ import type { AppState } from './types';
 /**
  * Global application store, composed from feature slices.
  *
- * Only non-sensitive preferences (display units, theme) are persisted. User
+ * Only non-sensitive preferences (display units, theme, voice guidance) are persisted. User
  * information, body data, predictions and scan history stay in memory until a
  * later step explicitly implements and justifies storing them.
  */
@@ -25,7 +25,12 @@ export const useAppStore = create<AppState>()(
       name: 'sizerai-settings',
       version: 2,
       storage: createJSONStorage(() => safeLocalStorage),
-      partialize: (state) => ({ heightUnit: state.heightUnit, weightUnit: state.weightUnit, theme: state.theme }),
+      partialize: (state) => ({
+        heightUnit: state.heightUnit,
+        weightUnit: state.weightUnit,
+        theme: state.theme,
+        voiceGuidance: state.voiceGuidance,
+      }),
       // v1 stored a single `units` system; map it onto the separate height/weight units.
       migrate: (persisted) => {
         const v1 = (persisted ?? {}) as { units?: string; theme?: ThemePreference };

@@ -53,7 +53,13 @@ images. Only frames that pass every check enter the capture buffer (any invalid 
 empties it); `buildCaptureFromHold` refuses an inconsistent buffer; the detection loop
 stops once its angle is captured, and the session reducer locks captured angles (one
 capture per angle, never overwritten). The flow is automatic: front → left → back →
-right → complete, with no manual capture. **No measurements, size prediction or size charts exist yet.**
+right → complete, with no manual capture.
+Scan guidance: one primary instruction shown large over the camera preview (`ScanInstruction`)
+plus the status panel; optional voice guidance (`useVoiceGuidance` → `utils/voiceSchedule.ts`
+scheduler → `services/speech.ts`, browser SpeechSynthesis only, prefers a male English system
+voice) speaks the same instruction with settle/min-gap/repeat rules so it never repeats per
+frame. Voice is output only — it never affects detection or capture. The voice on/off
+preference is persisted with the other display settings. **No measurements, size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
 the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
 full height, sets the minimum zoom only when the camera exposes zoom, and the
@@ -67,7 +73,7 @@ use cues actually in the camera's view. MediaPipe detects people from the head/u
 legs-only frame can't be detected; tracking can continue once detected.
 Scan session state is local to the page (no global state).
 User information and the clothing selection are kept in memory only (not
-persisted); height/weight display units and theme are persisted.
+persisted); height/weight display units, theme and the voice-guidance preference are persisted.
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
 Back/Continue) and `components/form/FormCard`.
 
@@ -91,11 +97,11 @@ src/
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
-                      (user, fit, settings); only display units/theme are persisted
+                      (user, fit, settings); only display units/theme/voice preference are persisted
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
-                      useCamera, useFrameQuality, useScanSession, usePoseScan)
+                      useCamera, useFrameQuality, useScanSession, usePoseScan, useVoiceGuidance)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
-                      frame analysis, pose/poseLandmarker = MediaPipe engine)
+                      frame analysis, pose/poseLandmarker = MediaPipe engine, speech)
   utils/              pure helpers: constants, motion presets, unit conversion,
                       user-info validation, clothing catalog + validation,
                       scan phases + scan guidance, scanPreview, pose/ (landmarks, orientation,

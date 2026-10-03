@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router';
-import { ArrowLeft, Cpu, Pause, Play, PowerOff, RotateCcw, ScanLine, ShieldCheck, SwitchCamera } from 'lucide-react';
+import {
+  ArrowLeft,
+  Cpu,
+  Pause,
+  Play,
+  PowerOff,
+  RotateCcw,
+  ScanLine,
+  ShieldCheck,
+  SwitchCamera,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Button } from '../components/Button';
 import { StepProgress } from '../components/StepProgress';
@@ -14,6 +26,7 @@ import { useCamera } from '../hooks/useCamera';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useFrameQuality } from '../hooks/useFrameQuality';
 import { usePoseScan, type PoseScanState } from '../hooks/usePoseScan';
+import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
 import { useScanSession, type UseScanSession } from '../hooks/useScanSession';
 import { FLOW_TOTAL_STEPS } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
@@ -71,7 +84,9 @@ export function BodyScanPage() {
   const pose = usePoseScan({
     videoRef: camera.videoRef,
     cameraActive,
-    scanning: scanning && !justCaptured,
+    // Detection keeps running during the brief "captured" confirmation, so tracking and stillness carry straight
+    // into the next angle (which still needs its own complete validation and hold).
+    scanning,
     target: session.currentPhase.id,
     scanRegion,
     calibration: frontCapture ? { frontalWidthRatio: frontCapture.widthRatio } : null,
@@ -112,6 +127,11 @@ export function BodyScanPage() {
     justCaptured: session.status === 'scanning' ? justCaptured : null,
     scanRegion,
   });
+
+  // Optional spoken guidance: the same instruction as on screen, never a factor in capture.
+  const voiceGuidance = useAppStore((s) => s.voiceGuidance);
+  const setVoiceGuidance = useAppStore((s) => s.setVoiceGuidance);
+  const voice = useVoiceGuidance(guidance, voiceGuidance && cameraActive);
 
   const clothingLabel = clothing
     ? `${getClothingItem(clothing.type).label}${clothing.fit ? ` · ${FIT_DEFINITIONS[clothing.fit].label} fit` : ''}`
@@ -172,6 +192,7 @@ export function BodyScanPage() {
             phaseLabel={showPhaseOnPreview ? session.currentPhase.label : null}
             guidePhase={session.currentPhase.id}
             guideRange={scanRegion.guideRange}
+            instruction={guidance}
             overlay={
               debug && (
                 <PoseDebugOverlay
@@ -195,6 +216,19 @@ export function BodyScanPage() {
               <Button variant="secondary" onClick={camera.stop}>
                 <PowerOff aria-hidden="true" size={18} />
                 Turn off camera
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setVoiceGuidance(!voiceGuidance)}
+                aria-pressed={voice.supported ? voiceGuidance : undefined}
+                disabled={!voice.supported}
+              >
+                {voiceGuidance && voice.supported ? (
+                  <Volume2 aria-hidden="true" size={18} />
+                ) : (
+                  <VolumeX aria-hidden="true" size={18} />
+                )}
+                {voice.supported ? `Voice guidance: ${voiceGuidance ? 'On' : 'Off'}` : 'Voice guidance unavailable'}
               </Button>
             </div>
           )}

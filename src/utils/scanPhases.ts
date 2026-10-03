@@ -30,13 +30,13 @@ export const SCAN_PHASES: ScanPhaseDefinition[] = [
   {
     id: 'back',
     label: 'Back',
-    instruction: 'Turn your back to the camera',
+    instruction: 'Turn around',
     detail: 'Keep turning to your left until your back faces the camera.',
   },
   {
     id: 'right',
     label: 'Right turn',
-    instruction: 'Turn to your right side',
+    instruction: 'Turn to your right',
     detail: 'One more quarter turn to your left, so you stand side-on facing the other way.',
   },
 ];

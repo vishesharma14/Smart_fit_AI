@@ -1,0 +1,72 @@
+.scan-instruction {
+  --tone: var(--color-secondary);
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--space-3) + 2rem);
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(92%, 30rem);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-bottom: 3px solid var(--tone);
+  border-radius: var(--radius-lg);
+  background: rgb(5 8 18 / 0.82);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  text-align: center;
+}
+
+.scan-instruction--warning {
+  --tone: var(--color-warning);
+}
+
+.scan-instruction--success {
+  --tone: var(--color-success);
+}
+
+.scan-instruction--error {
+  --tone: var(--color-danger);
+}
+
+.scan-instruction--neutral {
+  --tone: rgb(255 255 255 / 0.4);
+}
+
+.scan-instruction__text {
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 0.9rem + 1.6vw, 2rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+.scan-instruction__progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: rgb(255 255 255 / 0.15);
+}
+
+.scan-instruction__progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-secondary), var(--color-success));
+  transform-origin: left center;
+  transition: transform 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-instruction__progress-fill {
+    transition: none;
+  }
+}

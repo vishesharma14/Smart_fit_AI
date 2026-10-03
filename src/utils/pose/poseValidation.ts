@@ -27,7 +27,8 @@ export type PoseIssue =
    */
   | { kind: 'top-out'; canTilt: boolean }
   | { kind: 'bottom-out'; canTilt: boolean }
-  | { kind: 'off-centre' }
+  /** `step`: which way the user should step, from their own point of view, when it can be told (front / back). */
+  | { kind: 'off-centre'; step: 'left' | 'right' | null }
   | { kind: 'body-hidden'; part: BodyPart }
   | { kind: 'wrong-orientation'; detected: ScanPhaseId | null }
   | { kind: 'not-upright' }
@@ -265,8 +266,20 @@ export function assessPose({
 
   // 4. The region's arms / legs inside the left and right edges.
   const margin = config.horizontalMargin * visibleWidth;
-  if (scanRegion.edgePoints.some((i) => px[i].x < left + margin || px[i].x > left + visibleWidth - margin)) {
-    return fail({ kind: 'off-centre' });
+  const pastLeft = scanRegion.edgePoints.some((i) => px[i].x < left + margin);
+  const pastRight = scanRegion.edgePoints.some((i) => px[i].x > left + visibleWidth - margin);
+  if (pastLeft || pastRight) {
+    // In the (unmirrored) camera image, someone facing the camera has their own left on the image's right.
+    // Past the image's left edge they need to move toward the image's right: their left when facing the
+    // camera, their right with their back to it. Side-on (or past both edges) there is no single direction.
+    const towardImageRight = pastLeft && !pastRight;
+    const towardImageLeft = pastRight && !pastLeft;
+    const facing = orientation.orientation;
+    const step =
+      (towardImageRight || towardImageLeft) && (facing === 'front' || facing === 'back')
+        ? (towardImageRight === (facing === 'front') ? 'left' : 'right')
+        : null;
+    return fail({ kind: 'off-centre', step });
   }
 
   // 5. The region's key joints clearly visible (not hidden by clothing, furniture or poor light).
