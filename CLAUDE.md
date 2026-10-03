@@ -36,7 +36,7 @@ current step explicitly asks for it.**
 
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
 4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
-clothing-specific scan regions.
+clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4).
@@ -67,7 +67,18 @@ resizes; page behind inert and scroll-locked; landscape phones get the dock as a
 `viewport-fit=cover` + `env(safe-area-inset-*)` keep content clear of notches and the home
 indicator. Touch devices start
 with the rear camera (falls back to any camera); the screen is kept awake with the Wake Lock
-API where supported. Desktop keeps the page layout. **No measurements, size prediction or size charts exist yet.**
+API where supported. Desktop keeps the page layout.
+Measurement engine (Step 7, `utils/measurement/`, pure and unit-tested, **not yet wired into the UI**):
+`measureScan({ captures, region, userHeightCm })` → `MeasurementReport` (types in `types/measurement.ts`).
+Lengths between joints are measured on the captures' 3D world landmarks per angle and combined across
+angles (weighted median; agreement, visibility and angle coverage drive confidence): shoulder width
+(joint centres), arm length, torso length (upper/full) and leg length hip→ankle (lower/full).
+Girths (chest, waist, hip, thigh) and inseam are `unsupported` — joint landmarks don't describe the body
+surface or the crotch — and never get a value. Pixels are never treated as cm: scale comes from a
+calibration — `user-height` (entered height ÷ stature from a full-body front/back capture; the only one
+that allows `valid`), else `pose-model-metric` (model's metre estimate, low confidence → at most
+`uncertain`), else `none` (model units). Statuses: valid / uncertain / invalid (no value) / unsupported.
+**No size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
 the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
 full height, sets the minimum zoom only when the camera exposes zoom, and the
@@ -85,7 +96,8 @@ persisted); height/weight display units, theme and the voice-guidance preference
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
 Back/Continue) and `components/form/FormCard`.
 
-Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm run preview`.
+Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm test` (Vitest,
+`*.test.ts` next to the modules), `npm run preview`.
 
 ```
 src/
@@ -115,9 +127,12 @@ src/
                       user-info validation, clothing catalog + validation,
                       scan phases + scan guidance, scanPreview, pose/ (landmarks, orientation,
                       validation + capture hold, config, scanRegions = clothing → body region)
+  utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
+                      definitions (per-region measurements), measureScan; tests + testFixtures (tests only)
   types/domain.ts     domain types (lengths in cm, weight in kg)
   types/scan.ts       scan/camera types (ScanCapture = landmark snapshot)
   types/pose.ts       pose landmark types
+  types/measurement.ts  measurement / calibration / report types
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 
