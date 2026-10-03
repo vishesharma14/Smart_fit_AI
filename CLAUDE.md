@@ -61,8 +61,11 @@ voice) speaks the same instruction with settle/min-gap/repeat rules so it never 
 frame. Voice is output only — it never affects detection or capture. The voice on/off
 preference is persisted with the other display settings.
 Phones/touch tablets: while the camera is on, the scan stage becomes a full-screen view
-(angle strip, largest undistorted preview, large instruction, 48px+ controls; page behind
-inert and scroll-locked; landscape phones get a side control column). Touch devices start
+(compact angle strip on top, largest undistorted preview, and a bottom dock with the status /
+instruction / hold progress above 48px+ controls; fixed-height status so the preview never
+resizes; page behind inert and scroll-locked; landscape phones get the dock as a side column).
+`viewport-fit=cover` + `env(safe-area-inset-*)` keep content clear of notches and the home
+indicator. Touch devices start
 with the rear camera (falls back to any camera); the screen is kept awake with the Wake Lock
 API where supported. Desktop keeps the page layout. **No measurements, size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces

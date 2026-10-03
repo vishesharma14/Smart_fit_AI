@@ -236,10 +236,6 @@ export function BodyScanPage() {
             <div className="scan-page__immersive-top">
               <ScanPhaseProgress phases={session.phases} compact />
               {landscapePhone && <p className="scan-page__rotate-hint">Portrait orientation works best for scanning.</p>}
-              {/* The status panel is hidden behind the full-screen view, so announce guidance here. */}
-              <p className="visually-hidden" role="status" aria-live="polite">
-                {guidance.title}
-              </p>
             </div>
           )}
           <div className="scan-page__preview">
@@ -248,7 +244,8 @@ export function BodyScanPage() {
             phaseLabel={showPhaseOnPreview ? session.currentPhase.label : null}
             guidePhase={session.currentPhase.id}
             guideRange={scanRegion.guideRange}
-            instruction={guidance}
+            // On phones the instruction lives in the bottom dock instead, keeping the preview clear.
+            instruction={immersive ? null : guidance}
             overlay={
               debug && (
                 <PoseDebugOverlay
@@ -263,36 +260,50 @@ export function BodyScanPage() {
           />
           </div>
           {cameraActive && (
-            <div className="scan-page__camera-actions">
-              {immersive && <ScanControls session={session} compact />}
-              {camera.canSwitch && (
-                <Button variant="secondary" onClick={camera.switchCamera} aria-label={immersive ? 'Switch camera' : undefined}>
-                  <SwitchCamera aria-hidden="true" size={18} />
-                  {immersive ? 'Switch' : 'Switch camera'}
-                </Button>
+            <div className="scan-page__dock">
+              {immersive && (
+                // Guidance and status in thumb reach; this also announces guidance (the panel is hidden behind).
+                <>
+                  <ScanStatus guidance={guidance} />
+                  {pose.status === 'error' && (
+                    <Button variant="secondary" onClick={pose.retry}>
+                      <RotateCcw aria-hidden="true" size={18} />
+                      Try loading pose detection again
+                    </Button>
+                  )}
+                </>
               )}
-              <Button
-                variant="secondary"
-                onClick={() => setVoiceGuidance(!voiceGuidance)}
-                aria-pressed={voice.supported ? voiceGuidance : undefined}
-                aria-label={voice.supported ? 'Voice guidance' : 'Voice guidance unavailable'}
-                disabled={!voice.supported}
-              >
-                {voiceGuidance && voice.supported ? (
-                  <Volume2 aria-hidden="true" size={18} />
-                ) : (
-                  <VolumeX aria-hidden="true" size={18} />
+              <div className="scan-page__camera-actions">
+                {immersive && <ScanControls session={session} compact />}
+                {camera.canSwitch && (
+                  <Button variant="secondary" onClick={camera.switchCamera} aria-label={immersive ? 'Switch camera' : undefined}>
+                    <SwitchCamera aria-hidden="true" size={18} />
+                    {immersive ? 'Switch' : 'Switch camera'}
+                  </Button>
                 )}
-                {voice.supported
-                  ? `${immersive ? 'Voice' : 'Voice guidance'}: ${voiceGuidance ? 'On' : 'Off'}`
-                  : immersive
-                    ? 'No voice'
-                    : 'Voice guidance unavailable'}
-              </Button>
-              <Button variant="secondary" onClick={camera.stop} aria-label={immersive ? 'Exit and turn off camera' : undefined}>
-                <PowerOff aria-hidden="true" size={18} />
-                {immersive ? 'Exit' : 'Turn off camera'}
-              </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setVoiceGuidance(!voiceGuidance)}
+                  aria-pressed={voice.supported ? voiceGuidance : undefined}
+                  aria-label={voice.supported ? 'Voice guidance' : 'Voice guidance unavailable'}
+                  disabled={!voice.supported}
+                >
+                  {voiceGuidance && voice.supported ? (
+                    <Volume2 aria-hidden="true" size={18} />
+                  ) : (
+                    <VolumeX aria-hidden="true" size={18} />
+                  )}
+                  {voice.supported
+                    ? `${immersive ? 'Voice' : 'Voice guidance'}: ${voiceGuidance ? 'On' : 'Off'}`
+                    : immersive
+                      ? 'No voice'
+                      : 'Voice guidance unavailable'}
+                </Button>
+                <Button variant="secondary" onClick={camera.stop} aria-label={immersive ? 'Exit and turn off camera' : undefined}>
+                  <PowerOff aria-hidden="true" size={18} />
+                  {immersive ? 'Exit' : 'Turn off camera'}
+                </Button>
+              </div>
             </div>
           )}
         </motion.div>

@@ -288,6 +288,13 @@
   }
 }
 
+/* Guidance + controls below the preview (on desktop it only holds the camera buttons) */
+.scan-page__dock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 /* Preview wrapper (sizes the preview in the full-screen phone view) */
 .scan-page__preview {
   display: flex;
@@ -386,7 +393,7 @@
 /* Phone rotated to landscape: preview on the left, controls in a column on the right */
 .scan-page__stage--immersive.scan-page__stage--landscape {
   grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
   grid-template-areas:
     'top top'
     'preview actions';
@@ -400,16 +407,92 @@
   grid-area: preview;
 }
 
-.scan-page__stage--landscape .scan-page__camera-actions {
+.scan-page__stage--landscape .scan-page__dock {
   grid-area: actions;
-  grid-template-columns: minmax(0, 1fr);
-  align-content: center;
+  align-self: center;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.scan-page__stage--landscape .scan-page__camera-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scan-page__stage--immersive.scan-page__stage--landscape .scan-status {
+  height: auto;
+  min-height: 5rem;
+}
+
+/* Short landscape screens: the instruction alone; its detail is secondary */
+.scan-page__stage--immersive.scan-page__stage--landscape .scan-status__detail {
+  display: none;
+}
+
+.scan-page__stage--immersive.scan-page__stage--landscape .scan-status__title {
+  font-size: clamp(1.05rem, 5vh, 1.35rem);
 }
 
 .scan-page__stage--landscape .scan-page__controls {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .scan-page__stage--landscape .scan-instruction__text {
   font-size: clamp(1.25rem, 6vh, 2rem);
+}
+
+/*
+ * Bottom dock on phones: the current instruction, its detail and the hold
+ * progress sit right above the controls, in thumb reach, instead of over the
+ * preview. The status area has a fixed height (two lines each, clamped) so
+ * changing instructions never resize the preview.
+ */
+.scan-page__stage--immersive .scan-page__dock {
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: var(--radius-xl);
+  background: rgb(12 16 30 / 0.92);
+}
+
+.scan-page__stage--immersive .scan-status {
+  height: 8.5rem;
+  overflow: hidden;
+  padding: var(--space-3) var(--space-4);
+  border-color: transparent;
+  border-left-width: 4px;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.scan-page__stage--immersive .scan-status__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  /* Readable from a few steps away */
+  font-size: clamp(1.35rem, 6.2vw, 1.75rem);
+  line-height: 1.2;
+}
+
+.scan-page__stage--immersive .scan-status__detail {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Narrow phones: tighter page rhythm (less desktop-style whitespace). Kept last so it overrides the base rules. */
+@media (max-width: 29.99rem) {
+  .scan-page {
+    padding-block: var(--space-4) var(--space-8);
+  }
+
+  .scan-page__layout {
+    gap: var(--space-4);
+    padding-top: var(--space-5);
+  }
+
+  .scan-page__panel {
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
 }

@@ -5,5 +5,7 @@
   width: 100%;
   max-width: var(--container-max);
   margin-inline: auto;
-  padding-inline: var(--gutter);
+  /* Content stays clear of notches / rounded corners (viewport-fit=cover exposes the safe-area insets) */
+  padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
+  padding-bottom: env(safe-area-inset-bottom);
 }
