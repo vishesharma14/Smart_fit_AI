@@ -197,7 +197,7 @@ export function deriveScanGuidance(input: GuidanceInput): ScanGuidance {
 
   // Scanning.
   if (justCaptured) {
-    return { tone: 'success', title: `${justCaptured.label} captured`, detail: `Next: ${phase.instruction.toLowerCase()}.` };
+    return { tone: 'success', title: `${justCaptured.label} captured ✓`, detail: `Next: ${phase.instruction.toLowerCase()}.` };
   }
   if (pose.status !== 'ready') {
     return { tone: 'info', title: 'Starting pose detection…', detail: 'Loading the on-device pose model.' };

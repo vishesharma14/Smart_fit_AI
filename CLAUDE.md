@@ -49,7 +49,11 @@ upload). Per frame: one person, framing/distance, joint visibility, orientation
 upright, arms and stance, stillness. An angle is auto-captured only after the pose
 stays valid for `captureHoldMs` (1.5 s) and `captureMinFrames` consecutive frames
 (`utils/pose/poseConfig.ts`); the capture keeps averaged landmarks only, never
-images. **No measurements, size prediction or size charts exist yet.**
+images. Only frames that pass every check enter the capture buffer (any invalid frame
+empties it); `buildCaptureFromHold` refuses an inconsistent buffer; the detection loop
+stops once its angle is captured, and the session reducer locks captured angles (one
+capture per angle, never overwritten). The flow is automatic: front → left → back →
+right → complete, with no manual capture. **No measurements, size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
 the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
 full height, sets the minimum zoom only when the camera exposes zoom, and the

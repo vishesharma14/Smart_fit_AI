@@ -1,6 +1,7 @@
 import type { UseCamera } from '../../hooks/useCamera';
 import type { PoseScanState } from '../../hooks/usePoseScan';
 import { POSE_MODEL_NAME } from '../../services/pose/poseLandmarker';
+import type { ScanCapture, ScanPhaseId } from '../../types/scan';
 import type { ScanRegionDefinition } from '../../utils/pose/scanRegions';
 import './PoseDebugPanel.css';
 
@@ -12,9 +13,10 @@ interface PoseDebugPanelProps {
   pose: PoseScanState;
   camera: UseCamera;
   scanRegion: ScanRegionDefinition;
+  captures: Partial<Record<ScanPhaseId, ScanCapture>>;
 }
 
-export function PoseDebugPanel({ pose, camera, scanRegion }: PoseDebugPanelProps) {
+export function PoseDebugPanel({ pose, camera, scanRegion, captures }: PoseDebugPanelProps) {
   const { assessment, stats } = pose;
   const orientation = assessment?.orientation;
   const metrics = assessment?.metrics;
@@ -58,6 +60,12 @@ export function PoseDebugPanel({ pose, camera, scanRegion }: PoseDebugPanelProps
     ['Stance', fixed(metrics?.stanceRatio)],
     ['Jitter', `${fixed(pose.jitter, 3)}${pose.moving ? ' (moving)' : ''}`],
     ['Hold', fixed(pose.holdProgress)],
+    [
+      'Saved captures',
+      Object.values(captures)
+        .map((c) => `${c.phase}: ${c.sampleCount} frames / ${Math.round(c.holdMs)} ms`)
+        .join(' · ') || 'none',
+    ],
   ];
   return (
     <section className="pose-debug" aria-label="Pose detection debug values" data-testid="pose-debug">

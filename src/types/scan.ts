@@ -19,7 +19,13 @@ export type ScanPhaseStatus = 'pending' | 'active' | 'captured';
  * hold, never an image. Kept in memory on the scan page only.
  */
 export interface ScanCapture {
+  /** Angle this capture was validated for (always the angle that was active at the time). */
+  phase: ScanPhaseId;
   capturedAt: number;
+  /** Number of consecutive validated frames averaged into this capture. */
+  sampleCount: number;
+  /** How long the pose stayed continuously valid before capture, in ms. */
+  holdMs: number;
   /** Image landmarks (0–1 of the unmirrored video frame). */
   landmarks: PoseLandmark[];
   /** 3D landmarks in metres from the hip centre, as estimated by the model. */

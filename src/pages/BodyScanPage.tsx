@@ -217,7 +217,7 @@ export function BodyScanPage() {
 
           {cameraActive && <ScanControls session={session} />}
 
-          {debug && cameraActive && <PoseDebugPanel pose={pose} camera={camera} scanRegion={scanRegion} />}
+          {debug && cameraActive && <PoseDebugPanel pose={pose} camera={camera} scanRegion={scanRegion} captures={session.captures} />}
         </motion.section>
 
         <motion.p className="scan-page__privacy" variants={fadeUpItem}>

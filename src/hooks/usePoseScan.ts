@@ -1,6 +1,6 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { createPoseEngine, type PoseEngine } from '../services/pose/poseLandmarker';
-import type { PoseDelegate, PoseEngineStatus, PoseLandmark } from '../types/pose';
+import type { PoseDelegate, PoseEngineStatus } from '../types/pose';
 import type { FrameQuality, ScanCapture, ScanPhaseId } from '../types/scan';
 import { visibleRegion } from '../utils/pose/landmarks';
 import { POSE_SCAN_CONFIG } from '../utils/pose/poseConfig';
@@ -9,13 +9,14 @@ import type { ScanRegionDefinition } from '../utils/pose/scanRegions';
 import {
   HOLD_RESET,
   assessPose,
-  averageLandmarks,
+  buildCaptureFromHold,
   holdProgress,
   measureJitter,
   stepHold,
   type HoldState,
   type PoseAssessment,
   type StillnessSample,
+  type ValidatedSample,
 } from '../utils/pose/poseValidation';
 
 export interface PoseStats {
@@ -144,13 +145,18 @@ export function usePoseScan({
     let lastDuration = 0;
     let lastTimestamp = 0;
     let hold: HoldState = HOLD_RESET;
-    let holdFrames: { landmarks: PoseLandmark[]; world: PoseLandmark[] }[] = [];
+    // Only frames that passed every check for this angle enter the capture buffer; any invalid frame empties it.
+    let holdSamples: ValidatedSample[] = [];
+    // Set once this angle has been captured: the loop then stops analysing, so the angle can never be captured
+    // twice and no later (e.g. turning) frame can reach the saved data.
+    let captured = false;
     let previousView: CoarseView | null = null;
     const stillness: StillnessSample[] = [];
     const timings: number[] = [];
     const runTimes: number[] = [];
 
     const tick = (now: number) => {
+      if (captured) return;
       frameId = requestAnimationFrame(tick);
       if (now - lastRun < intervalMs || now - lastEnd < Math.max(MIN_IDLE_MS, lastDuration)) return;
       const video = videoRef.current;
@@ -199,27 +205,37 @@ export function usePoseScan({
         frameQuality.brightness === 'ok' &&
         !frameQuality.moving;
 
-      hold = stepHold(hold, valid, now);
-      if (valid && assessment.landmarks && assessment.worldLandmarks) {
-        holdFrames.push({ landmarks: assessment.landmarks, world: assessment.worldLandmarks });
+      const validSample: ValidatedSample | null =
+        valid && assessment.landmarks && assessment.worldLandmarks
+          ? { time: now, landmarks: assessment.landmarks, worldLandmarks: assessment.worldLandmarks }
+          : null;
+      hold = stepHold(hold, validSample !== null, now);
+      if (validSample) {
+        holdSamples.push(validSample);
       } else {
-        holdFrames = [];
+        holdSamples = [];
       }
       const progress = holdProgress(hold, now);
 
-      if (progress >= 1 && assessment.orientation) {
-        onCaptureRef.current(target, {
-          capturedAt: Date.now(),
-          landmarks: averageLandmarks(holdFrames.map((f) => f.landmarks)),
-          worldLandmarks: averageLandmarks(holdFrames.map((f) => f.world)),
-          videoWidth: frame.videoWidth,
-          videoHeight: frame.videoHeight,
-          scanRegion: scanRegion.id,
-          widthRatio: assessment.orientation.widthRatio,
-          orientationConfidence: assessment.orientation.confidence,
-        });
+      if (progress >= 1 && validSample && assessment.orientation?.orientation === target) {
+        const result = buildCaptureFromHold(hold, holdSamples, now);
+        if (result) {
+          captured = true;
+          cancelAnimationFrame(frameId);
+          onCaptureRef.current(target, {
+            phase: target,
+            capturedAt: Date.now(),
+            ...result,
+            videoWidth: frame.videoWidth,
+            videoHeight: frame.videoHeight,
+            scanRegion: scanRegion.id,
+            widthRatio: assessment.orientation.widthRatio,
+            orientationConfidence: assessment.orientation.confidence,
+          });
+        }
+        // Either way the hold starts over; an untrustworthy buffer is discarded, never saved.
         hold = HOLD_RESET;
-        holdFrames = [];
+        holdSamples = [];
       }
 
       // A transition, so these frequent updates never hold up urgent work such as a route change.
@@ -240,7 +256,7 @@ export function usePoseScan({
     frameId = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frameId);
-      holdFrames = [];
+      holdSamples = [];
       stillness.length = 0;
       // Never show a stale result after pausing or moving to the next angle.
       setLive(IDLE_LIVE);

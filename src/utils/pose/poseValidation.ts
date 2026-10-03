@@ -360,6 +360,38 @@ export function holdProgress(state: HoldState, now: number, config: PoseScanConf
   return Math.min((now - state.since) / config.captureHoldMs, state.frames / config.captureMinFrames, 1);
 }
 
+/** One frame that passed every check for the current angle, kept for the capture average. */
+export interface ValidatedSample {
+  time: number;
+  landmarks: PoseLandmark[];
+  worldLandmarks: PoseLandmark[];
+}
+
+/**
+ * Builds the averaged capture from the hold's validated samples, or returns
+ * null when the buffer can't be trusted: too few samples, too short a hold,
+ * or a sample count that doesn't match the run of consecutive valid frames
+ * (meaning a frame was dropped or added outside the hold).
+ */
+export function buildCaptureFromHold(
+  hold: HoldState,
+  samples: ValidatedSample[],
+  now: number,
+  config: PoseScanConfig = POSE_SCAN_CONFIG,
+): { landmarks: PoseLandmark[]; worldLandmarks: PoseLandmark[]; sampleCount: number; holdMs: number } | null {
+  if (hold.since === null || samples.length === 0) return null;
+  const holdMs = now - hold.since;
+  if (samples.length !== hold.frames) return null;
+  if (samples.length < config.captureMinFrames || holdMs < config.captureHoldMs) return null;
+  if (samples[0].time !== hold.since) return null;
+  return {
+    landmarks: averageLandmarks(samples.map((sample) => sample.landmarks)),
+    worldLandmarks: averageLandmarks(samples.map((sample) => sample.worldLandmarks)),
+    sampleCount: samples.length,
+    holdMs,
+  };
+}
+
 /** Per-landmark average of the frames collected during a hold, to reduce frame-to-frame noise. */
 export function averageLandmarks(frames: PoseLandmark[][]): PoseLandmark[] {
   const count = frames.length;
