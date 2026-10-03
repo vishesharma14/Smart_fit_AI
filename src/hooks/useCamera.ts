@@ -3,6 +3,7 @@ import {
   applyWidestZoom,
   cameraUnavailableReason,
   countVideoInputs,
+  preferredFacingMode,
   requestCameraStream,
   stopCameraStream,
   toCameraErrorKind,
@@ -42,7 +43,8 @@ export function useCamera(): UseCamera {
 
   const [status, setStatus] = useState<CameraStatus>('idle');
   const [error, setError] = useState<CameraErrorKind | null>(null);
-  const [facingMode, setFacingMode] = useState<FacingMode>('user');
+  // Rear camera first on phones, the webcam on computers (see preferredFacingMode).
+  const [facingMode, setFacingMode] = useState<FacingMode>(preferredFacingMode);
   const [canSwitch, setCanSwitch] = useState(false);
   const [videoSize, setVideoSize] = useState<{ width: number; height: number } | null>(null);
   const [zoom, setZoom] = useState<CameraZoom | null>(null);

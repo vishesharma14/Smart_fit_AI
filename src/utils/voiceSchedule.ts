@@ -35,6 +35,8 @@ export interface VoiceRequest {
 export class VoiceScheduler {
   private pending: (VoiceRequest & { since: number }) | null = null;
   private lastText: string | null = null;
+  /** Instruction included in the last sentence (e.g. "Turn to your left." in a capture confirmation). */
+  private coveredText: string | null = null;
   private lastAt = -Infinity;
 
   private readonly output: VoiceOutput;
@@ -60,14 +62,13 @@ export class VoiceScheduler {
   tick(now: number): void {
     const request = this.pending;
     if (!request) return;
-    const sameAsLast = request.text === this.lastText;
+    const sameAsLast = request.text === this.lastText || request.text === this.coveredText;
     const repeatDue = request.repeatable !== false && now - this.lastAt >= this.timing.repeatMs;
     if (sameAsLast && !repeatDue) return;
 
     if (request.priority) {
-      this.say(request.text, now);
-      // The instruction it already contained counts as just spoken, so it isn't said again right after.
-      if (request.covers) this.lastText = request.covers;
+      // The instruction it already contains counts as just spoken, so it isn't said again right after.
+      this.say(request.text, now, request.covers);
       return;
     }
     if (now - request.since < this.timing.settleMs) return;
@@ -80,13 +81,15 @@ export class VoiceScheduler {
   reset(): void {
     this.pending = null;
     this.lastText = null;
+    this.coveredText = null;
     this.lastAt = -Infinity;
     this.output.cancel();
   }
 
-  private say(text: string, now: number): void {
+  private say(text: string, now: number, covers: string | null = null): void {
     this.output.speak(text);
     this.lastText = text;
+    this.coveredText = covers;
     this.lastAt = now;
   }
 }

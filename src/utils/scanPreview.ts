@@ -12,8 +12,13 @@ const MIN_PREVIEW_ASPECT = 9 / 16;
  * streams keep 3:4: only their sides are trimmed, which never hides the head
  * or feet.
  */
-export function previewAspectRatio(videoSize: { width: number; height: number } | null): number {
+export function previewAspectRatio(
+  videoSize: { width: number; height: number } | null,
+  /** Show the video in its own shape whatever it is (e.g. a phone held in landscape has room for it). */
+  native = false,
+): number {
   if (!videoSize) return DEFAULT_PREVIEW_ASPECT;
   const aspect = videoSize.width / videoSize.height;
+  if (native) return Math.max(aspect, MIN_PREVIEW_ASPECT);
   return aspect < DEFAULT_PREVIEW_ASPECT ? Math.max(aspect, MIN_PREVIEW_ASPECT) : DEFAULT_PREVIEW_ASPECT;
 }

@@ -18,19 +18,41 @@ export function cameraUnavailableReason(): CameraErrorKind | null {
  * camera has one, otherwise the browser trims the sides (which the portrait
  * preview trims anyway). 960×720 has fewer pixels than 1280×720, keeping pose
  * inference fast: larger frames slowed it markedly in testing, and the pose
- * model works on a much smaller image anyway.
- * All values are `ideal`, so every camera still works.
+ * model works on a much smaller image anyway. 30 fps is plenty for ~10 pose
+ * checks a second and avoids decoding 60 fps on phones. All values are
+ * `ideal`, so every camera still works.
+ *
+ * If the requested camera (e.g. the rear camera) can't be opened, any
+ * available camera is used instead.
  */
-export function requestCameraStream(facingMode: FacingMode): Promise<MediaStream> {
-  return navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      facingMode: { ideal: facingMode },
-      aspectRatio: { ideal: 4 / 3 },
-      width: { ideal: 960 },
-      height: { ideal: 720 },
-    },
-  });
+export async function requestCameraStream(facingMode: FacingMode): Promise<MediaStream> {
+  const video: MediaTrackConstraints = {
+    aspectRatio: { ideal: 4 / 3 },
+    width: { ideal: 960 },
+    height: { ideal: 720 },
+    frameRate: { ideal: 30 },
+  };
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...video, facingMode: { ideal: facingMode } } });
+  } catch (error) {
+    const name = error instanceof DOMException || error instanceof Error ? error.name : '';
+    if (name !== 'OverconstrainedError' && name !== 'NotFoundError' && name !== 'NotReadableError') throw error;
+    return navigator.mediaDevices.getUserMedia({ audio: false, video });
+  }
+}
+
+/**
+ * Phones and tablets (touch as the primary input, screen up to tablet size)
+ * start with the rear camera, which usually has a wider, sharper view for
+ * scanning a body; laptops and desktops start with their (front) webcam. The
+ * user can switch either way, and a device without a rear camera simply gets
+ * its front camera.
+ */
+export function preferredFacingMode(): FacingMode {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'user';
+  const touchPrimary = window.matchMedia('(pointer: coarse)').matches;
+  const handheldScreen = Math.min(window.screen.width, window.screen.height) < 1100;
+  return touchPrimary && handheldScreen ? 'environment' : 'user';
 }
 
 /** Zoom support reported by the camera (Image Capture extensions; absent on many cameras and browsers). */

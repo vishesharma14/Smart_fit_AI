@@ -21,7 +21,15 @@ export interface SpeechOutput {
 }
 
 export function isSpeechSupported(): boolean {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof window.speechSynthesis?.speak === 'function' &&
+      typeof window.SpeechSynthesisUtterance === 'function'
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -43,11 +51,19 @@ export function createBrowserSpeech(): SpeechOutput | null {
   const synth = window.speechSynthesis;
   let voice: SpeechSynthesisVoice | null = null;
   const loadVoices = () => {
-    voice = pickGuideVoice(synth.getVoices());
+    try {
+      voice = pickGuideVoice(synth.getVoices() ?? []);
+    } catch {
+      voice = null;
+    }
   };
   loadVoices();
   // Many browsers load their voice list asynchronously.
-  synth.addEventListener?.('voiceschanged', loadVoices);
+  try {
+    synth.addEventListener?.('voiceschanged', loadVoices);
+  } catch {
+    // Keep the default voice.
+  }
 
   return {
     speak: (text) => {
@@ -76,6 +92,12 @@ export function createBrowserSpeech(): SpeechOutput | null {
         // Ignore.
       }
     },
-    isSpeaking: () => synth.speaking || synth.pending,
+    isSpeaking: () => {
+      try {
+        return synth.speaking || synth.pending;
+      } catch {
+        return false;
+      }
+    },
   };
 }

@@ -287,3 +287,129 @@
     flex-direction: column;
   }
 }
+
+/* Preview wrapper (sizes the preview in the full-screen phone view) */
+.scan-page__preview {
+  display: flex;
+  justify-content: center;
+}
+
+/*
+ * Full-screen phone scan (while the camera is on): angle strip on top, the
+ * largest preview that fits the camera's own shape (never stretched), the
+ * large instruction over it, and touch-sized controls at the bottom.
+ */
+.scan-page__stage--immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  /* Fill the screen (a centred grid item would otherwise shrink to its content) */
+  justify-self: stretch;
+  align-self: stretch;
+  height: auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  width: auto;
+  padding: max(env(safe-area-inset-top), var(--space-2)) max(env(safe-area-inset-right), var(--space-2))
+    max(env(safe-area-inset-bottom), var(--space-3)) max(env(safe-area-inset-left), var(--space-2));
+  background: #03050c;
+  overscroll-behavior: contain;
+}
+
+.scan-page__immersive-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.scan-page__rotate-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.scan-page__stage--immersive .scan-page__preview {
+  min-height: 0;
+  container-type: size;
+  align-items: center;
+  /* No panning or pinch-zoom over the preview while scanning */
+  touch-action: none;
+}
+
+.scan-page__stage--immersive .scan-viewport {
+  /* As large as fits, in the preview's own aspect ratio */
+  width: min(100cqw, calc(100cqh * var(--preview-aspect, 0.75)));
+  border-radius: var(--radius-lg);
+}
+
+.scan-page__stage--immersive .scan-instruction {
+  width: min(94%, 30rem);
+}
+
+/* Readable from a few steps away on a phone */
+.scan-page__stage--immersive .scan-instruction__text {
+  font-size: clamp(1.5rem, 7vw, 2.25rem);
+}
+
+.scan-page__stage--immersive .scan-page__camera-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  touch-action: manipulation;
+}
+
+.scan-page__stage--immersive .scan-page__camera-actions > .button {
+  min-height: 3rem;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+/* Scan controls span the full width above the camera buttons */
+.scan-page__stage--immersive .scan-page__controls {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.scan-page__stage--immersive .scan-page__controls .button {
+  min-height: 3.25rem;
+  padding: 0 var(--space-3);
+}
+
+.scan-page__stage--immersive .scan-page__controls > :only-child,
+.scan-page__stage--immersive .scan-page__next-note {
+  grid-column: 1 / -1;
+}
+
+/* Phone rotated to landscape: preview on the left, controls in a column on the right */
+.scan-page__stage--immersive.scan-page__stage--landscape {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem);
+  grid-template-areas:
+    'top top'
+    'preview actions';
+}
+
+.scan-page__stage--landscape .scan-page__immersive-top {
+  grid-area: top;
+}
+
+.scan-page__stage--landscape .scan-page__preview {
+  grid-area: preview;
+}
+
+.scan-page__stage--landscape .scan-page__camera-actions {
+  grid-area: actions;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+}
+
+.scan-page__stage--landscape .scan-page__controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.scan-page__stage--landscape .scan-instruction__text {
+  font-size: clamp(1.25rem, 6vh, 2rem);
+}

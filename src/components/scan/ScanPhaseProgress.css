@@ -69,3 +69,41 @@
   color: var(--color-text-muted);
   text-align: right;
 }
+
+/* Compact one-line strip for the full-screen phone scan */
+.scan-phases-strip {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scan-phases-strip__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: var(--radius-full);
+  background: rgb(255 255 255 / 0.06);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.scan-phases-strip__item--active {
+  border-color: rgb(139 92 246 / 0.6);
+  background: rgb(139 92 246 / 0.2);
+  color: var(--color-text);
+}
+
+.scan-phases-strip__item--captured {
+  border-color: rgb(52 211 153 / 0.5);
+  background: rgb(52 211 153 / 0.14);
+  color: var(--color-success);
+}

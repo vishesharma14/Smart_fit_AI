@@ -18,7 +18,13 @@ export function useVoiceGuidance(guidance: ScanGuidance, enabled: boolean): { su
   // One scheduler (and speech output) while enabled; speech stops when turned off or on leaving the page.
   useEffect(() => {
     if (!enabled || !supported) return;
-    const output = createBrowserSpeech();
+    let output;
+    try {
+      output = createBrowserSpeech();
+    } catch {
+      output = null;
+    }
+    // Speech is optional: if it can't be set up, the scan simply continues silently.
     if (!output) return;
     const scheduler = new VoiceScheduler(output);
     schedulerRef.current = scheduler;

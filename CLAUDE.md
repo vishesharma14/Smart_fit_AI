@@ -59,7 +59,12 @@ plus the status panel; optional voice guidance (`useVoiceGuidance` → `utils/vo
 scheduler → `services/speech.ts`, browser SpeechSynthesis only, prefers a male English system
 voice) speaks the same instruction with settle/min-gap/repeat rules so it never repeats per
 frame. Voice is output only — it never affects detection or capture. The voice on/off
-preference is persisted with the other display settings. **No measurements, size prediction or size charts exist yet.**
+preference is persisted with the other display settings.
+Phones/touch tablets: while the camera is on, the scan stage becomes a full-screen view
+(angle strip, largest undistorted preview, large instruction, 48px+ controls; page behind
+inert and scroll-locked; landscape phones get a side control column). Touch devices start
+with the rear camera (falls back to any camera); the screen is kept awake with the Wake Lock
+API where supported. Desktop keeps the page layout. **No measurements, size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
 the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
 full height, sets the minimum zoom only when the camera exposes zoom, and the
@@ -99,7 +104,8 @@ src/
   store/              Zustand store (useAppStore) composed from slices/
                       (user, fit, settings); only display units/theme/voice preference are persisted
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
-                      useCamera, useFrameQuality, useScanSession, usePoseScan, useVoiceGuidance)
+                      useCamera, useFrameQuality, useScanSession, usePoseScan, useVoiceGuidance,
+                      useMediaQuery, useScrollLock, useWakeLock)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
                       frame analysis, pose/poseLandmarker = MediaPipe engine, speech)
   utils/              pure helpers: constants, motion presets, unit conversion,

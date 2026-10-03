@@ -26,7 +26,10 @@ import { useCamera } from '../hooks/useCamera';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useFrameQuality } from '../hooks/useFrameQuality';
 import { usePoseScan, type PoseScanState } from '../hooks/usePoseScan';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useScrollLock } from '../hooks/useScrollLock';
 import { useVoiceGuidance } from '../hooks/useVoiceGuidance';
+import { useWakeLock } from '../hooks/useWakeLock';
 import { useScanSession, type UseScanSession } from '../hooks/useScanSession';
 import { FLOW_TOTAL_STEPS } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
@@ -40,6 +43,15 @@ import { previewAspectRatio } from '../utils/scanPreview';
 import { SCAN_PHASES, type ScanPhaseDefinition } from '../utils/scanPhases';
 import type { ScanCapture, ScanPhaseId } from '../types/scan';
 import './BodyScanPage.css';
+
+/**
+ * Phones and touch tablets (portrait or landscape) get a full-screen scan view
+ * while the camera is on, since they are usually propped up and viewed from a
+ * distance. Computers keep the page layout.
+ */
+const IMMERSIVE_QUERY = '(max-width: 47.99rem), (pointer: coarse) and (max-width: 64rem)';
+const LANDSCAPE_PHONE_QUERY = '(orientation: landscape) and (max-height: 31.25rem)';
+const LANDSCAPE_QUERY = '(orientation: landscape)';
 
 /** How long the "Front captured" confirmation stays before guidance for the next angle resumes. */
 const CAPTURED_MESSAGE_MS = 1000;
@@ -60,6 +72,33 @@ export function BodyScanPage() {
 
   const cameraActive = camera.status === 'active';
   const scanning = cameraActive && session.status === 'scanning';
+
+  // Full-screen phone scan: the preview fills the screen and the page behind can't scroll or take focus.
+  const phoneLayout = useMediaQuery(IMMERSIVE_QUERY);
+  const landscapePhone = useMediaQuery(LANDSCAPE_PHONE_QUERY);
+  const landscape = useMediaQuery(LANDSCAPE_QUERY);
+  const immersive = phoneLayout && cameraActive;
+  useScrollLock(immersive);
+  // Keep the screen awake while the camera is on (where supported).
+  useWakeLock(cameraActive);
+  const pageRef = useRef<HTMLDivElement>(null);
+  // Tablets and small laptops: bring the whole preview into view when the camera starts.
+  useEffect(() => {
+    if (!cameraActive || phoneLayout) return;
+    const stage = pageRef.current?.querySelector('.scan-page__stage');
+    const rect = stage?.getBoundingClientRect();
+    if (rect && (rect.top < 0 || rect.bottom > window.innerHeight)) {
+      stage?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [cameraActive, phoneLayout]);
+  useEffect(() => {
+    const hidden = pageRef.current?.querySelectorAll<HTMLElement>(
+      '.scan-page__header, .scan-page__intro, .scan-page__panel, .scan-page__privacy',
+    );
+    hidden?.forEach((element) => {
+      element.inert = immersive;
+    });
+  }, [immersive]);
   const quality = useFrameQuality(camera.videoRef, scanning);
 
   // Brief confirmation after each automatic capture.
@@ -112,10 +151,10 @@ export function BodyScanPage() {
     focusStateRef.current = state;
     if (document.activeElement && document.activeElement !== document.body) return;
     const target = cameraActive
-      ? panelRef.current?.querySelector<HTMLElement>('.scan-page__primary')
+      ? (immersive ? stageRef : panelRef).current?.querySelector<HTMLElement>('.scan-page__primary')
       : stageRef.current?.querySelector<HTMLElement>('.scan-viewport .button');
     target?.focus();
-  }, [camera.status, sessionStatus, cameraActive]);
+  }, [camera.status, sessionStatus, cameraActive, immersive]);
 
   const guidance = deriveScanGuidance({
     cameraStatus: camera.status,
@@ -139,7 +178,7 @@ export function BodyScanPage() {
   const showPhaseOnPreview = session.status === 'scanning' || session.status === 'paused';
 
   return (
-    <div className="scan-page">
+    <div ref={pageRef} className="scan-page">
       <motion.div
         className="scan-page__header"
         initial={{ opacity: 0 }}
@@ -183,10 +222,27 @@ export function BodyScanPage() {
 
         <motion.div
           ref={stageRef}
-          className="scan-page__stage"
+          className={[
+            'scan-page__stage',
+            immersive ? 'scan-page__stage--immersive' : '',
+            immersive && landscapePhone ? 'scan-page__stage--landscape' : '',
+          ].join(' ')}
           variants={fadeUpItem}
-          style={{ '--preview-aspect': previewAspectRatio(camera.videoSize) } as CSSProperties}
+          style={{ '--preview-aspect': previewAspectRatio(camera.videoSize, immersive && landscape) } as CSSProperties}
+          aria-label={immersive ? 'Body scan camera' : undefined}
+          role={immersive ? 'region' : undefined}
         >
+          {immersive && (
+            <div className="scan-page__immersive-top">
+              <ScanPhaseProgress phases={session.phases} compact />
+              {landscapePhone && <p className="scan-page__rotate-hint">Portrait orientation works best for scanning.</p>}
+              {/* The status panel is hidden behind the full-screen view, so announce guidance here. */}
+              <p className="visually-hidden" role="status" aria-live="polite">
+                {guidance.title}
+              </p>
+            </div>
+          )}
+          <div className="scan-page__preview">
           <ScanViewport
             camera={camera}
             phaseLabel={showPhaseOnPreview ? session.currentPhase.label : null}
@@ -205,22 +261,21 @@ export function BodyScanPage() {
               )
             }
           />
+          </div>
           {cameraActive && (
             <div className="scan-page__camera-actions">
+              {immersive && <ScanControls session={session} compact />}
               {camera.canSwitch && (
-                <Button variant="secondary" onClick={camera.switchCamera}>
+                <Button variant="secondary" onClick={camera.switchCamera} aria-label={immersive ? 'Switch camera' : undefined}>
                   <SwitchCamera aria-hidden="true" size={18} />
-                  Switch camera
+                  {immersive ? 'Switch' : 'Switch camera'}
                 </Button>
               )}
-              <Button variant="secondary" onClick={camera.stop}>
-                <PowerOff aria-hidden="true" size={18} />
-                Turn off camera
-              </Button>
               <Button
                 variant="secondary"
                 onClick={() => setVoiceGuidance(!voiceGuidance)}
                 aria-pressed={voice.supported ? voiceGuidance : undefined}
+                aria-label={voice.supported ? 'Voice guidance' : 'Voice guidance unavailable'}
                 disabled={!voice.supported}
               >
                 {voiceGuidance && voice.supported ? (
@@ -228,7 +283,15 @@ export function BodyScanPage() {
                 ) : (
                   <VolumeX aria-hidden="true" size={18} />
                 )}
-                {voice.supported ? `Voice guidance: ${voiceGuidance ? 'On' : 'Off'}` : 'Voice guidance unavailable'}
+                {voice.supported
+                  ? `${immersive ? 'Voice' : 'Voice guidance'}: ${voiceGuidance ? 'On' : 'Off'}`
+                  : immersive
+                    ? 'No voice'
+                    : 'Voice guidance unavailable'}
+              </Button>
+              <Button variant="secondary" onClick={camera.stop} aria-label={immersive ? 'Exit and turn off camera' : undefined}>
+                <PowerOff aria-hidden="true" size={18} />
+                {immersive ? 'Exit' : 'Turn off camera'}
               </Button>
             </div>
           )}
@@ -249,7 +312,7 @@ export function BodyScanPage() {
             <ScanPhaseProgress phases={session.phases} />
           </div>
 
-          {cameraActive && <ScanControls session={session} />}
+          {cameraActive && !immersive && <ScanControls session={session} />}
 
           {debug && cameraActive && <PoseDebugPanel pose={pose} camera={camera} scanRegion={scanRegion} captures={session.captures} />}
         </motion.section>
@@ -270,13 +333,15 @@ export function BodyScanPage() {
 
 interface ScanControlsProps {
   session: UseScanSession;
+  /** Shorter labels for the full-screen phone control bar. */
+  compact?: boolean;
 }
 
 /**
  * Start / Pause / Resume share one primary button so keyboard focus stays in
  * place as the scan changes state. Angles are captured automatically.
  */
-function ScanControls({ session }: ScanControlsProps) {
+function ScanControls({ session, compact = false }: ScanControlsProps) {
   const { status } = session;
   const primary =
     status === 'ready'
@@ -298,7 +363,7 @@ function ScanControls({ session }: ScanControlsProps) {
       {(status === 'scanning' || status === 'paused') && (
         <Button variant="secondary" size="lg" onClick={session.restart}>
           <RotateCcw aria-hidden="true" size={18} />
-          Restart scan
+          {compact ? 'Restart' : 'Restart scan'}
         </Button>
       )}
 
