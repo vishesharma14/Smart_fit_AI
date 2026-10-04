@@ -3,6 +3,11 @@ import type { ScanCapture } from '../../types/scan';
 import { LM } from '../pose/landmarks';
 import { aggregateSamples, combineConfidence, type AngleSample } from './aggregate';
 import { distance, isFinitePoint, midpoint, visibleLandmarks } from './geometry';
+import {
+  jointStaturePx,
+  SILHOUETTE_STATURE_MAX_DISAGREEMENT,
+  SILHOUETTE_STATURE_TOLERANCE,
+} from '../silhouette/outlineQuality';
 
 /*
  * Calibration: how landmark distances become centimetres.
@@ -137,12 +142,7 @@ export function applyCalibration(
   return { value: valueUnits * calibration.cmPerUnit, unit: 'cm' };
 }
 
-/**
- * The joints only give a rough stature (the head top is extrapolated above the ears), so the outline's stature may
- * differ from it by this much without penalty, and is distrusted beyond the maximum.
- */
-export const SILHOUETTE_STATURE_TOLERANCE = 0.1;
-export const SILHOUETTE_STATURE_MAX_DISAGREEMENT = 0.25;
+export { SILHOUETTE_STATURE_MAX_DISAGREEMENT, SILHOUETTE_STATURE_TOLERANCE };
 
 export interface SilhouetteScale {
   cmPerPx: number;
@@ -167,12 +167,8 @@ export function silhouetteScale(capture: ScanCapture, userHeightCm: number | nul
   if (!(staturePx > 0)) return null;
 
   // Rough cross-check from the joints, in the same mask pixels: head top extrapolated above the ears, to the heels.
-  const y = (i: number) => capture.landmarks[i]?.y * outline.height;
-  const earY = (y(LM.leftEar) + y(LM.rightEar)) / 2;
-  const shoulderY = (y(LM.leftShoulder) + y(LM.rightShoulder)) / 2;
-  const heelY = (y(LM.leftHeel) + y(LM.rightHeel)) / 2;
-  const jointStature = heelY - (earY + HEAD_TOP_FACTOR * (earY - shoulderY));
-  if (!(jointStature > 0)) return null;
+  const jointStature = jointStaturePx(capture.landmarks, outline.height);
+  if (jointStature === null) return null;
   const disagreement = Math.abs(staturePx - jointStature) / staturePx;
   if (disagreement > SILHOUETTE_STATURE_MAX_DISAGREEMENT) return null;
 

@@ -1,26 +1,27 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { createPoseEngine, type MaskView, type PoseEngine } from '../services/pose/poseLandmarker';
 import type { PoseDelegate, PoseEngineStatus, PoseLandmark } from '../types/pose';
-import type { FrameQuality, ScanCapture, ScanPhaseId } from '../types/scan';
+import type { FrameQuality, ScanCapture, ScanViewId } from '../types/scan';
 import type { SilhouetteFrame } from '../types/silhouette';
 import { visibleRegion } from '../utils/pose/landmarks';
 import { POSE_SCAN_CONFIG } from '../utils/pose/poseConfig';
 import type { CoarseView, OrientationCalibration } from '../utils/pose/poseOrientation';
 import type { ScanRegionDefinition } from '../utils/pose/scanRegions';
+import { assessPose, measureJitter, type PoseAssessment, type StillnessSample } from '../utils/pose/poseValidation';
+import { bodyYawForScan, type BodyYaw } from '../utils/scan360/bodyYaw';
 import {
-  HOLD_RESET,
-  assessPose,
-  buildCaptureFromHold,
-  holdProgress,
-  measureJitter,
-  stepHold,
-  type HoldState,
-  type PoseAssessment,
-  type StillnessSample,
-  type ValidatedSample,
-} from '../utils/pose/poseValidation';
-import { combineSilhouetteFrames } from '../utils/silhouette/combine';
+  EMPTY_VIEW_HOLD,
+  decideFrame,
+  stepViewHold,
+  viewHoldProgress,
+  type CapturedView,
+  type FrameDecision,
+  type FrameRejection,
+  type HoldFailure,
+  type ViewHold,
+} from '../utils/scan360/capture';
 import { extractSilhouetteFrame } from '../utils/silhouette/extract';
+import { assessOutlineFrame, type OutlineQuality } from '../utils/silhouette/outlineQuality';
 
 export interface PoseStats {
   /** Average time the model took per frame over the last few runs, in ms. */
@@ -39,8 +40,20 @@ export interface PoseScanState {
   /** Landmarks moved more than the stillness limit recently, or stillness can't be judged yet. */
   moving: boolean;
   jitter: number | null;
-  /** 0–1 progress toward auto-capture of the current angle. */
+  /** 0–1 progress toward capturing the view being held. */
   holdProgress: number;
+  /** View currently being held (accepted frames accumulating), or null. */
+  holdView: ScanViewId | null;
+  /** Body angle estimated for the latest frame. */
+  yaw: BodyYaw | null;
+  /** Whether the latest frame counted toward a view, and why not. */
+  decision: FrameDecision | null;
+  /** Quality of the latest frame's body outline (when its mask was read). */
+  outline: OutlineQuality | null;
+  /** Why the last completed hold was discarded, if it was. */
+  lastHoldFailure: HoldFailure | null;
+  /** Frames accepted / rejected (by reason) since detection started; developer view. */
+  frameCounts: FrameCounts;
   stats: PoseStats | null;
   /** Latest frame's body outline (developer view only; null otherwise). */
   silhouette: SilhouetteFrame | null;
@@ -48,19 +61,22 @@ export interface PoseScanState {
   retry: () => void;
 }
 
+export type FrameCounts = { accepted: number } & Partial<Record<FrameRejection, number>>;
+
 interface UsePoseScanOptions {
   videoRef: RefObject<HTMLVideoElement | null>;
   /** Load the model while the camera is on. */
   cameraActive: boolean;
   /** Run detection only while the scan is in progress. */
   scanning: boolean;
-  target: ScanPhaseId;
-  /** Body region to validate (from the selected clothing). */
+  /** Body region to validate (the full body for the 360° scan). */
   scanRegion: ScanRegionDefinition;
   calibration: OrientationCalibration | null;
   /** Lighting and frame-difference movement from the existing frame checks. */
   quality: FrameQuality | null;
-  onCapture: (phase: ScanPhaseId, capture: ScanCapture) => void;
+  /** Views already captured in this session (no frame counts toward them again). */
+  captured: CapturedView[];
+  onCapture: (view: ScanViewId, capture: ScanCapture) => void;
   intervalMs?: number;
   /** Force the GPU or CPU delegate (testing only). */
   delegate?: PoseDelegate;
@@ -68,16 +84,22 @@ interface UsePoseScanOptions {
   debug?: boolean;
 }
 
-interface LiveState {
-  assessment: PoseAssessment | null;
-  moving: boolean;
-  jitter: number | null;
-  holdProgress: number;
-  stats: PoseStats | null;
-  silhouette: SilhouetteFrame | null;
-}
+type LiveState = Omit<PoseScanState, 'status' | 'delegate' | 'retry'>;
 
-const IDLE_LIVE: LiveState = { assessment: null, moving: false, jitter: null, holdProgress: 0, stats: null, silhouette: null };
+const IDLE_LIVE: LiveState = {
+  assessment: null,
+  moving: false,
+  jitter: null,
+  holdProgress: 0,
+  holdView: null,
+  yaw: null,
+  decision: null,
+  outline: null,
+  lastHoldFailure: null,
+  frameCounts: { accepted: 0 },
+  stats: null,
+  silhouette: null,
+};
 const STATS_WINDOW = 20;
 const MIN_STILLNESS_SAMPLES = 3;
 /**
@@ -88,25 +110,24 @@ const MIN_STILLNESS_SAMPLES = 3;
 const MIN_IDLE_MS = 40;
 
 /**
- * Real-time pose detection for the scan: loads the on-device pose model while
- * the camera is on, analyses about ten frames per second while scanning,
- * validates the pose for the current angle, and calls `onCapture` with a
- * landmark snapshot once the pose has been valid and still for the hold time.
- *
- * During a hold it also reads the person's segmentation mask, turns it into
- * outline numbers inside the model call (the mask itself is never kept) and
- * adds their per-row median to the capture. The outline never decides
- * whether or when an angle is captured: a missing or poor outline only
- * leaves the capture without one.
+ * Real-time detection for the guided 360° scan: loads the on-device pose
+ * model while the camera is on and analyses about ten frames per second while
+ * scanning. For each frame it validates the pose, estimates the body angle,
+ * reads the person's segmentation mask inside the model call and turns it into
+ * outline numbers (the mask itself is never kept), and decides whether the
+ * frame counts toward an uncaptured view (`decideFrame`). Accepted frames of
+ * one view are combined into a capture once they have been steady long enough
+ * (`stepViewHold`), and `onCapture` receives landmarks, the angle and the
+ * outline numbers — never an image.
  */
 export function usePoseScan({
   videoRef,
   cameraActive,
   scanning,
-  target,
   scanRegion,
   calibration,
   quality,
+  captured,
   onCapture,
   intervalMs = POSE_SCAN_CONFIG.inferenceIntervalMs,
   delegate: preferredDelegate,
@@ -120,10 +141,12 @@ export function usePoseScan({
   // Latest values for the detection loop, without restarting it on every render.
   const qualityRef = useRef(quality);
   const onCaptureRef = useRef(onCapture);
+  const capturedRef = useRef(captured);
   useEffect(() => {
     qualityRef.current = quality;
     onCaptureRef.current = onCapture;
-  });
+    capturedRef.current = captured;
+  }, [quality, onCapture, captured]);
 
   // Model lifecycle: created while the camera is on, released when it turns off or the page closes.
   useEffect(() => {
@@ -168,12 +191,10 @@ export function usePoseScan({
     let lastEnd = -Infinity;
     let lastDuration = 0;
     let lastTimestamp = 0;
-    let hold: HoldState = HOLD_RESET;
-    // Only frames that passed every check for this angle enter the capture buffer; any invalid frame empties it.
-    let holdSamples: ValidatedSample[] = [];
-    // Set once this angle has been captured: the loop then stops analysing, so the angle can never be captured
-    // twice and no later (e.g. turning) frame can reach the saved data.
-    let captured = false;
+    let viewHold: ViewHold = EMPTY_VIEW_HOLD;
+    let lastHoldFailure: HoldFailure | null = null;
+    let lastPoseValid = false;
+    const frameCounts: FrameCounts = { accepted: 0 };
     let previousView: CoarseView | null = null;
     const stillness = stillnessRef.current;
     const timings: number[] = [];
@@ -181,7 +202,6 @@ export function usePoseScan({
     const silhouetteTimings: number[] = [];
 
     const tick = (now: number) => {
-      if (captured) return;
       frameId = requestAnimationFrame(tick);
       if (now - lastRun < intervalMs || now - lastEnd < Math.max(MIN_IDLE_MS, lastDuration)) return;
       const video = videoRef.current;
@@ -192,14 +212,14 @@ export function usePoseScan({
       const timestamp = Math.max(Math.round(now), lastTimestamp + 1);
       lastTimestamp = timestamp;
       const started = performance.now();
-      // The outline is only needed while a hold is under way (the previous frame was valid), or in the developer view.
-      const outline: { frame: SilhouetteFrame | null } = { frame: null };
+      // The outline is needed whenever the pose is valid (it decides whether a frame counts), and in the developer view.
+      const outlineHolder: { frame: SilhouetteFrame | null } = { frame: null };
       const readMask =
-        debug || hold.frames > 0
+        debug || lastPoseValid
           ? (mask: MaskView, index: number, landmarks: PoseLandmark[]) => {
               if (index !== 0) return;
               const begun = performance.now();
-              outline.frame = extractSilhouetteFrame(mask, landmarks);
+              outlineHolder.frame = extractSilhouetteFrame(mask, landmarks);
               silhouetteTimings.push(performance.now() - begun);
               if (silhouetteTimings.length > STATS_WINDOW) silhouetteTimings.shift();
             }
@@ -211,7 +231,7 @@ export function usePoseScan({
         return;
       }
       // Only one person's outline can be trusted (the scan requires one person anyway).
-      const silhouette = frame.landmarks.length === 1 ? outline.frame : null;
+      const silhouette = frame.landmarks.length === 1 ? outlineHolder.frame : null;
       lastEnd = performance.now();
       lastDuration = lastEnd - started;
       timings.push(lastDuration);
@@ -220,8 +240,9 @@ export function usePoseScan({
       while (runTimes.length && runTimes[0] < now - 1000) runTimes.shift();
 
       const region = visibleRegion(video.videoWidth, video.videoHeight, video.clientWidth, video.clientHeight);
-      const assessment = assessPose({ frame, region, target, calibration: calibrationValue, previousView, scanRegion });
+      const assessment = assessPose({ frame, region, calibration: calibrationValue, previousView, scanRegion });
       previousView = assessment.orientation?.view ?? null;
+      lastPoseValid = assessment.issue === null;
 
       // Stillness from landmark movement over a short window.
       if (assessment.pixels && assessment.metrics) {
@@ -237,48 +258,57 @@ export function usePoseScan({
       const moving = jitter === null || jitter > POSE_SCAN_CONFIG.maxJitter;
 
       const frameQuality = qualityRef.current;
-      const valid =
-        assessment.issue === null &&
-        !moving &&
-        frameQuality !== null &&
-        frameQuality.brightness === 'ok' &&
-        !frameQuality.moving;
+      const lightingOk = frameQuality !== null && frameQuality.brightness === 'ok' && !frameQuality.moving;
+      const yaw = assessment.orientation ? bodyYawForScan(assessment.orientation, calibrationValue !== null) : null;
+      const outline = assessOutlineFrame(silhouette, assessment.landmarks);
+      const decision = decideFrame({
+        poseValid: assessment.issue === null,
+        lightingOk,
+        moving,
+        yaw,
+        outline,
+        captured: capturedRef.current,
+      });
+      if (decision.accept) frameCounts.accepted += 1;
+      else if (decision.reason) frameCounts[decision.reason] = (frameCounts[decision.reason] ?? 0) + 1;
 
-      const validSample: ValidatedSample | null =
-        valid && assessment.landmarks && assessment.worldLandmarks
-          ? { time: now, landmarks: assessment.landmarks, worldLandmarks: assessment.worldLandmarks, silhouette }
+      const sample =
+        decision.accept && silhouette && yaw && outline.staturePx !== null && assessment.landmarks && assessment.worldLandmarks
+          ? {
+              time: now,
+              landmarks: assessment.landmarks,
+              worldLandmarks: assessment.worldLandmarks,
+              silhouette,
+              yawDeg: yaw.yawDeg,
+              staturePx: outline.staturePx,
+              widthRatio: assessment.orientation!.widthRatio,
+            }
           : null;
-      hold = stepHold(hold, validSample !== null, now);
-      if (validSample) {
-        holdSamples.push(validSample);
-      } else {
-        holdSamples = [];
+      const step = stepViewHold(viewHold, decision, sample, now);
+      viewHold = step.hold;
+      if (step.failure) lastHoldFailure = step.failure;
+      if (step.capture) {
+        const { view, ...data } = step.capture;
+        lastHoldFailure = null;
+        // Counted as captured at once, so no further frame can start a second capture of this view.
+        capturedRef.current = [...capturedRef.current, { view, yawDeg: data.yawDeg }];
+        onCaptureRef.current(view, {
+          phase: view,
+          capturedAt: Date.now(),
+          landmarks: data.landmarks,
+          worldLandmarks: data.worldLandmarks,
+          sampleCount: data.sampleCount,
+          holdMs: data.holdMs,
+          yawDeg: data.yawDeg,
+          videoWidth: frame.videoWidth,
+          videoHeight: frame.videoHeight,
+          scanRegion: scanRegion.id,
+          widthRatio: data.widthRatio,
+          orientationConfidence: yaw?.confidence ?? 0,
+          silhouette: data.silhouette,
+        });
       }
-      const progress = holdProgress(hold, now);
-
-      if (progress >= 1 && validSample && assessment.orientation?.orientation === target) {
-        const result = buildCaptureFromHold(hold, holdSamples, now);
-        if (result) {
-          captured = true;
-          cancelAnimationFrame(frameId);
-          // Median outline of the hold frames; null (no outline) never blocks the capture.
-          const profile = combineSilhouetteFrames(holdSamples.map((sample) => sample.silhouette));
-          onCaptureRef.current(target, {
-            phase: target,
-            capturedAt: Date.now(),
-            ...result,
-            videoWidth: frame.videoWidth,
-            videoHeight: frame.videoHeight,
-            scanRegion: scanRegion.id,
-            widthRatio: assessment.orientation.widthRatio,
-            orientationConfidence: assessment.orientation.confidence,
-            ...(profile ? { silhouette: profile } : {}),
-          });
-        }
-        // Either way the hold starts over; an untrustworthy buffer is discarded, never saved.
-        hold = HOLD_RESET;
-        holdSamples = [];
-      }
+      const progress = viewHoldProgress(viewHold, now);
 
       // A transition, so these frequent updates never hold up urgent work such as a route change.
       startTransition(() =>
@@ -286,7 +316,13 @@ export function usePoseScan({
           assessment,
           moving,
           jitter,
-          holdProgress: progress >= 1 ? 1 : progress,
+          holdProgress: progress,
+          holdView: viewHold.view,
+          yaw,
+          decision,
+          outline: silhouette ? outline : null,
+          lastHoldFailure,
+          frameCounts: { ...frameCounts },
           stats: {
             inferenceMs: timings.reduce((sum, value) => sum + value, 0) / timings.length,
             detectionsPerSecond: runTimes.length,
@@ -302,11 +338,10 @@ export function usePoseScan({
     frameId = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frameId);
-      holdSamples = [];
-      // Never show a stale result after pausing or moving to the next angle.
+      // Never show a stale result after pausing or restarting.
       setLive(IDLE_LIVE);
     };
-  }, [engine, scanning, target, scanRegion, calibrationRatio, intervalMs, videoRef, debug]);
+  }, [engine, scanning, scanRegion, calibrationRatio, intervalMs, videoRef, debug]);
 
   const retry = useCallback(() => {
     setFailed(false);

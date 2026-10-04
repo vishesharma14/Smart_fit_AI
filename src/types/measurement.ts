@@ -1,5 +1,5 @@
 import type { ClothingType } from './domain';
-import type { ScanPhaseId } from './scan';
+import type { ScanViewId } from './scan';
 
 /*
  * Body measurements derived from the scan's captured pose landmarks.
@@ -48,7 +48,7 @@ export interface MeasurementSource {
   /** How the value was derived. */
   method: 'landmark-geometry' | 'silhouette-geometry' | 'not-measurable';
   /** Captured angles that contributed a usable sample. */
-  angles: ScanPhaseId[];
+  angles: ScanViewId[];
   /** Number of individual samples combined (e.g. both arms in the front view). */
   sampleCount: number;
   /** Landmarks the measurement is based on (MediaPipe names). */
@@ -87,7 +87,7 @@ export interface MeasurementReport {
   measurements: Measurement[];
   calibration: CalibrationResult;
   /** Angles whose captures were usable for this region. */
-  anglesUsed: ScanPhaseId[];
+  anglesUsed: ScanViewId[];
   /** Captures that were ignored and why (e.g. wrong region or malformed data). */
   warnings: string[];
 }

@@ -16,6 +16,10 @@ export const SILHOUETTE_CONFIG = {
   minFrames: 3,
   /** Width jitter at which steadiness counts for nothing. */
   maxWidthJitter: 0.08,
+  /** 360° scan: a frame's outline needs at least this median edge sharpness to be part of a capture. */
+  minFrameSharpness: 0.35,
+  /** 360° scan: the outline height may vary this much (relative) across a capture's frames. */
+  maxStatureSpread: 0.04,
 
   /** Measurement levels, as fractions of the shoulder→hip-joint distance below the shoulders (front / back views). */
   chestBand: [0.22, 0.36],

@@ -34,6 +34,21 @@ export const POSE_SCAN_CONFIG = {
   minStanceRatio: 0.55,
   maxStanceRatio: 2.8,
 
+  /**
+   * Guided 360° scan. A view is captured after this many consecutive accepted frames over at least this long,
+   * while the body angle stays within `maxViewYawSpreadDeg`. Shorter than a fixed-angle hold, since the user pauses
+   * briefly while turning.
+   */
+  viewHoldMs: 1000,
+  viewMinFrames: 8,
+  maxViewYawSpreadDeg: 12,
+  /** A frame belongs to a view when its body angle is within this many degrees of the view's target angle. */
+  viewToleranceDeg: 15,
+  /** A new view must be at least this far (degrees) from every view already captured. */
+  minViewSeparationDeg: 30,
+  /** Minimum confidence of the body-angle estimate for a frame to count toward a view. */
+  minYawConfidence: 0.5,
+
   /** Landmark movement over the stillness window, relative to torso length. */
   maxJitter: 0.035,
   stillnessWindowMs: 600,

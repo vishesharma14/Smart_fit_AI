@@ -1,6 +1,6 @@
 import type { Measurement } from '../../types/measurement';
-import type { ScanCapture, ScanPhaseId } from '../../types/scan';
-import { depthAt, findFrontLevels, handAtRow, type LevelFailure, type LevelId } from '../silhouette/levels';
+import type { ScanCapture, ScanViewId } from '../../types/scan';
+import { depthAt, findFrontLevels, handAtRow, projectedWidthAt, type LevelFailure, type LevelId } from '../silhouette/levels';
 import { SILHOUETTE_CONFIG } from '../silhouette/silhouetteConfig';
 import { aggregateSamples, combineConfidence, statusFromConfidence, type AggregateResult, type AngleSample } from './aggregate';
 import { silhouetteScale, type SilhouetteScale } from './calibration';
@@ -39,6 +39,11 @@ export const SILHOUETTE_MEASUREMENT = {
   /** Below this mean sample quality, the reason mentions soft or unsteady edges. */
   lowQuality: 0.6,
   lowConsistency: 0.5,
+  /** Relative error of an angled view's width against the elliptical prediction at which agreement reaches 0. */
+  crossSectionTolerance: 0.12,
+  /** Cross-section factor without any angled view to check it, and at complete disagreement (1 at full agreement). */
+  uncheckedCrossSection: 0.9,
+  minCrossSection: 0.75,
 } as const;
 
 export const VALIDATION_NOTE =
@@ -75,7 +80,28 @@ function sampleQuality(item: ScaledCapture, sharpness: number): number {
   return clamp01(sharpness) * steadiness * item.scale.confidence;
 }
 
-const isFrontBack = (phase: ScanPhaseId) => phase === 'front' || phase === 'back';
+const isFrontBack = (phase: ScanViewId) => phase === 'front' || phase === 'back';
+const isSide = (phase: ScanViewId) => phase === 'left' || phase === 'right';
+
+/**
+ * 45° views (360° scan): the width an elliptical cross-section of width W and depth D would show at the view's
+ * measured angle θ, √((W·cos θ)² + (D·sin θ)²), compared with the width actually measured there. They don't change
+ * the value; they confirm (or question) the elliptical model behind it.
+ */
+function crossSectionAgreement(scaled: ScaledCapture[], heightFraction: number, widthCm: number, depthCm: number): number | null {
+  const agreements: number[] = [];
+  for (const item of scaled) {
+    const yaw = item.capture.yawDeg;
+    if (isFrontBack(item.capture.phase) || isSide(item.capture.phase) || yaw === undefined) continue;
+    const seen = projectedWidthAt(item.capture.silhouette!, item.capture.landmarks, heightFraction);
+    if (!seen) continue;
+    const theta = (yaw * Math.PI) / 180;
+    const predicted = Math.hypot(widthCm * Math.cos(theta), depthCm * Math.sin(theta));
+    const relativeError = Math.abs(seen.sizePx * item.scale.cmPerPx - predicted) / predicted;
+    agreements.push(clamp01(1 - relativeError / SILHOUETTE_MEASUREMENT.crossSectionTolerance));
+  }
+  return agreements.length > 0 ? agreements.reduce((sum, a) => sum + a, 0) / agreements.length : null;
+}
 
 function base(definition: SilhouetteDefinition) {
   return {
@@ -86,7 +112,7 @@ function base(definition: SilhouetteDefinition) {
   };
 }
 
-function invalid(definition: SilhouetteDefinition, reason: string, angles: ScanPhaseId[] = []): Measurement {
+function invalid(definition: SilhouetteDefinition, reason: string, angles: ScanViewId[] = []): Measurement {
   return {
     ...base(definition),
     value: null,
@@ -108,7 +134,7 @@ function result(
   const computed = statusFromConfidence(confidence, true);
   // Capped until validated against tape measurements: never `valid`.
   const status = computed === 'valid' ? 'uncertain' : computed;
-  const angles: ScanPhaseId[] = [];
+  const angles: ScanViewId[] = [];
   for (const agg of aggregates) for (const angle of agg.angles) if (!angles.includes(angle)) angles.push(angle);
   const meanQuality = aggregates.reduce((sum, agg) => sum + agg.meanWeight, 0) / aggregates.length;
   const allCauses = [...causes];
@@ -137,7 +163,7 @@ function result(
 }
 
 /** Leaves out views whose outline height disagrees with the others (see `maxStatureDeviation`). */
-function consistentViews(scaled: ScaledCapture[]): { kept: ScaledCapture[]; dropped: ScanPhaseId[] } {
+function consistentViews(scaled: ScaledCapture[]): { kept: ScaledCapture[]; dropped: ScanViewId[] } {
   if (scaled.length < 3) return { kept: scaled, dropped: [] };
   const stature = (item: ScaledCapture) => item.capture.silhouette!.floorY! - item.capture.silhouette!.headTopY!;
   const sorted = scaled.map(stature).sort((a, b) => a - b);
@@ -147,7 +173,7 @@ function consistentViews(scaled: ScaledCapture[]): { kept: ScaledCapture[]; drop
   return { kept, dropped: scaled.filter((item) => !kept.includes(item)).map((item) => item.capture.phase) };
 }
 
-const droppedCause = (dropped: ScanPhaseId[]) =>
+const droppedCause = (dropped: ScanViewId[]) =>
   dropped.length > 0 ? [`the ${dropped.join(' and ')} outline’s height did not match the other views, so it was left out`] : [];
 
 function girth(definition: SilhouetteDefinition, level: LevelId, scaled: ScaledCapture[], extraCauses: string[]): Measurement {
@@ -173,7 +199,7 @@ function girth(definition: SilhouetteDefinition, level: LevelId, scaled: ScaledC
   const heightFraction = fractions.reduce((sum, f) => sum + f, 0) / fractions.length;
   const depths: AngleSample[] = [];
   let handAtSide = false;
-  for (const item of scaled.filter((s) => !isFrontBack(s.capture.phase))) {
+  for (const item of scaled.filter((s) => isSide(s.capture.phase))) {
     const outline = item.capture.silhouette!;
     const depth = depthAt(outline, heightFraction);
     if (!depth) continue;
@@ -190,12 +216,23 @@ function girth(definition: SilhouetteDefinition, level: LevelId, scaled: ScaledC
 
   const coverage = (widthAgg.angles.length + depthAgg.angles.length) / 4;
   const model = level === 'thigh' ? SILHOUETTE_MEASUREMENT.thighModelConfidence : SILHOUETTE_MEASUREMENT.ellipseModelConfidence;
+  // The legs overlap in angled views, so the thigh's cross-section can't be checked there.
+  const agreement = level === 'thigh' ? null : crossSectionAgreement(scaled, heightFraction, widthAgg.value, depthAgg.value);
+  const crossSection =
+    agreement === null
+      ? SILHOUETTE_MEASUREMENT.uncheckedCrossSection
+      : SILHOUETTE_MEASUREMENT.minCrossSection + (1 - SILHOUETTE_MEASUREMENT.minCrossSection) * agreement;
+  const causes = [...extraCauses];
+  if (handAtSide) causes.push('a hand at your side may have widened a side view');
+  if (agreement !== null && agreement < SILHOUETTE_MEASUREMENT.lowConsistency) {
+    causes.push('the angled views did not match an elliptical cross-section at that height');
+  }
   return result(
     definition,
     ellipsePerimeter(widthAgg.value / 2, depthAgg.value / 2),
-    [widthAgg.meanWeight, depthAgg.meanWeight, widthAgg.consistency, depthAgg.consistency, 0.5 + 0.5 * coverage, model],
+    [widthAgg.meanWeight, depthAgg.meanWeight, widthAgg.consistency, depthAgg.consistency, 0.5 + 0.5 * coverage, model, crossSection],
     [widthAgg, depthAgg],
-    [...extraCauses, ...(handAtSide ? ['a hand at your side may have widened a side view'] : [])],
+    causes,
   );
 }
 

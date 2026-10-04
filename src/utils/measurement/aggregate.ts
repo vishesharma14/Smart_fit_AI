@@ -1,5 +1,5 @@
 import type { MeasurementStatus } from '../../types/measurement';
-import type { ScanPhaseId } from '../../types/scan';
+import type { ScanViewId } from '../../types/scan';
 
 /*
  * Combining one measurement's samples from several captured angles, and the
@@ -8,7 +8,7 @@ import type { ScanPhaseId } from '../../types/scan';
 
 /** One measurement taken from one captured angle (e.g. the left arm in the front view). */
 export interface AngleSample {
-  angle: ScanPhaseId;
+  angle: ScanViewId;
   /** In world-landmark units (before calibration). */
   value: number;
   /** 0–1 quality of this sample (the lowest visibility of the landmarks it used). */
@@ -25,7 +25,7 @@ export interface AggregateResult {
   /** Mean sample weight (0–1). */
   meanWeight: number;
   sampleCount: number;
-  angles: ScanPhaseId[];
+  angles: ScanViewId[];
 }
 
 export interface AggregateOptions {
@@ -73,7 +73,7 @@ export function aggregateSamples(samples: AngleSample[], options: AggregateOptio
   const consistency =
     usable.length === 1 ? clamp01(singleSampleConsistency) : clamp01(1 - relativeSpread / maxRelativeSpread);
 
-  const angles: ScanPhaseId[] = [];
+  const angles: ScanViewId[] = [];
   for (const sample of usable) if (!angles.includes(sample.angle)) angles.push(sample.angle);
 
   return {

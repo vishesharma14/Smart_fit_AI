@@ -1,10 +1,11 @@
 import type { CalibrationResult, Measurement, MeasurementReport } from '../../types/measurement';
-import type { ScanCapture, ScanPhaseId } from '../../types/scan';
+import type { ScanCapture, ScanViewId } from '../../types/scan';
 import type { ScanRegionId } from '../pose/scanRegions';
 import { aggregateSamples, angleCoverage, combineConfidence, statusFromConfidence, type AngleSample } from './aggregate';
 import { applyCalibration, calibrateFromUserHeight, chooseCalibration, poseModelMetricCalibration } from './calibration';
 import { definitionsForRegion, type LandmarkDefinition, type UnsupportedDefinition } from './definitions';
 import { measureSilhouette } from './silhouetteMeasure';
+import { SCAN_VIEWS } from '../scan360/views';
 
 /*
  * The measurement engine: turns the scan's captured angles (averaged pose
@@ -19,14 +20,14 @@ import { measureSilhouette } from './silhouetteMeasure';
 
 /** MediaPipe Pose returns 33 landmarks per person. */
 export const POSE_LANDMARK_COUNT = 33;
-const PHASE_ORDER: ScanPhaseId[] = ['front', 'left', 'back', 'right'];
+const PHASE_ORDER: ScanViewId[] = SCAN_VIEWS.map((view) => view.id);
 
 /** Below these, the reason names the factor as a cause. */
 const LOW_VISIBILITY = 0.8;
 const LOW_CONSISTENCY = 0.5;
 
 export interface MeasureScanInput {
-  captures: Partial<Record<ScanPhaseId, ScanCapture>>;
+  captures: Partial<Record<ScanViewId, ScanCapture>>;
   region: ScanRegionId;
   /** The height the user entered (cm); enables the `user-height` calibration. */
   userHeightCm?: number | null;

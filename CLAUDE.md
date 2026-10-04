@@ -37,7 +37,7 @@ current step explicitly asks for it.**
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
 4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
-8 (measurement review and confirmation), 9B (silhouette measurements).
+8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -48,14 +48,20 @@ and movement checks plus **MediaPipe Pose Landmarker (Full model)** running on-d
 (`@mediapipe/tasks-vision`; model in `public/models/`, wasm bundled — no CDN, no
 upload). Per frame: one person, framing/distance, joint visibility, orientation
 (front / turned left / back / turned right, from several voting signals),
-upright, arms and stance, stillness. An angle is auto-captured only after the pose
-stays valid for `captureHoldMs` (1.5 s) and `captureMinFrames` consecutive frames
-(`utils/pose/poseConfig.ts`); the capture keeps averaged landmarks only, never
-images. Only frames that pass every check enter the capture buffer (any invalid frame
-empties it); `buildCaptureFromHold` refuses an inconsistent buffer; the detection loop
-stops once its angle is captured, and the session reducer locks captured angles (one
-capture per angle, never overwritten). The flow is automatic: front → left → back →
-right → complete, with no manual capture.
+upright, arms and stance (front/back views), stillness — `assessPose` has no target angle.
+Guided automatic 360° scan (Step 9C, `utils/scan360/`): the user faces the camera, then turns slowly to the left.
+`bodyYaw.ts` turns the orientation votes into a continuous body angle (|cos| from shoulder width relative to the
+front view's width ratio; front/back and left/right signs from the existing votes; before the front is captured
+the front is recognised by the orientation classifier and defines 0°). Eight views (`views.ts`: 0°, 45°…315°, ±15°
+windows; cardinal = front/left/back/right). `capture.ts` `decideFrame` accepts a frame only with a valid pose, good
+light, a clear angle inside an uncaptured view's window (front first; ≥30° from captured angles), a usable outline
+(`silhouette/outlineQuality.ts`: head/feet in frame, height consistent with the joints, sharp edges) and stillness,
+else returns the reason; `stepViewHold` captures after `viewMinFrames` (8) over `viewHoldMs` (1 s) with per-landmark
+and per-row medians, discarding holds whose angle (>12°) or outline height (>4%) drifted. Captures keep landmarks,
+the measured angle and outline numbers only. `session.ts` (one capture per view, never overwritten): complete with
+all 8 views, or the 4 cardinal views + turning back to face the camera; "Finish with N views" only with front + a
+side view. UI: coverage ring (`ScanCoverage`), live angle, capture-quality pill, guide figure turned to the next
+view, concise guidance (`scanGuidance.ts`) and voice. No timers decide views.
 Scan guidance: one primary instruction shown large over the camera preview (`ScanInstruction`)
 plus the status panel; optional voice guidance (`useVoiceGuidance` → `utils/voiceSchedule.ts`
 scheduler → `services/speech.ts`, browser SpeechSynthesis only, prefers a male English system
@@ -63,7 +69,7 @@ voice) speaks the same instruction with settle/min-gap/repeat rules so it never 
 frame. Voice is output only — it never affects detection or capture. The voice on/off
 preference is persisted with the other display settings.
 Phones/touch tablets: while the camera is on, the scan stage becomes a full-screen view
-(compact angle strip on top, largest undistorted preview, and a bottom dock with the status /
+(compact coverage ring on top, largest undistorted preview, and a bottom dock with the status /
 instruction / hold progress above 48px+ controls; fixed-height status so the preview never
 resizes; page behind inert and scroll-locked; landscape phones get the dock as a side column).
 `viewport-fit=cover` + `env(safe-area-inset-*)` keep content clear of notches and the home
@@ -79,7 +85,7 @@ Girths and inseam come from the body outline (Step 9B, below). Pixels are never 
 calibration — `user-height` (entered height ÷ stature from a full-body front/back capture; the only one
 that allows `valid`), else `pose-model-metric` (model's metre estimate, low confidence → at most
 `uncertain`), else `none` (model units). Statuses: valid / uncertain / invalid (no value) / unsupported.
-Measurement review (Step 8): when all four angles are captured, "Review measurements" on the scan page runs
+Measurement review (Step 8): when the scan is finished, "Review measurements" on the scan page runs
 `measureCompletedScan` (`utils/measurement/fromScan.ts` → `measureScan`, region from the selected garment,
 the entered height) and stores the `ScanMeasurementResult` as `scanMeasurements`, then opens
 `/measurements` (`MeasurementReviewPage`). It lists every measurement with value/unit, status, confidence
@@ -89,21 +95,25 @@ and kept exactly as typed (`utils/measurement/review.ts`); edits keep the engine
 in the user slice (in memory only; a new scan result clears an older confirmation) — the input for size
 prediction later.
 Silhouette measurements (Step 9B): the Pose Landmarker runs with `outputSegmentationMasks: true` (same model). The
-mask is read only inside the detection callback (`detect(video, ts, readMask)`), only during a hold or in
+mask is read only inside the detection callback (`detect(video, ts, readMask)`), only while the pose is valid or in
 `?poseDebug`, and turned straight into numbers by `utils/silhouette/extract.ts` (per-row edge runs seeded from the
 joints, head top / floor traced along connected runs, crotch = top of the leg gap); it is never copied, stored or
 uploaded. `combine.ts` takes the per-row median over the hold frames (+ width jitter) → `ScanCapture.silhouette`
-(optional: a missing/poor outline never blocks or alters a capture; capture rules are unchanged). Every scan now
+(in the 360° scan a frame needs a usable outline to count; poor outlines lower confidence or make measurements
+unavailable, never guessed). Every scan now
 validates the full body (`SCAN_FRAMING_REGION`) so the entered height can scale each capture
 (`silhouetteScale`: height ÷ outline head-top-to-floor, per capture; views whose outline height is >8% off the
 median are left out). `levels.ts` finds chest / waist / hip / thigh rows on front/back outlines (arms/hands must be
 clear) and reads side depth at the same height fraction; `utils/measurement/silhouetteMeasure.ts` gives girths as
 ellipse perimeters (width × depth) and inseam = crotch→floor, with confidence from edge sharpness, steadiness, scale
-trust, view agreement, coverage and a model factor. **Outline measurements are capped at `uncertain` until validated
+trust, view agreement, coverage and a model factor; depth only from the true side views, and 45° views check the
+elliptical cross-section (√((W cos θ)² + (D sin θ)²) vs measured width), raising or lowering confidence without
+changing values. **Outline measurements are capped at `uncertain` until validated
 against tape measurements of real people.** Tunables: `utils/silhouette/silhouetteConfig.ts`, `SILHOUETTE_MEASUREMENT`.
 **No size prediction or size charts exist yet.**
-`?poseDebug` shows a developer panel + skeleton, plus the live outline edges, head top / floor / crotch and the
-measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
+`?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
+coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
+crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
 full height, sets the minimum zoom only when the camera exposes zoom, and the
 preview follows a portrait stream's shape (never cropping head/feet).
 Scan regions (`utils/pose/scanRegions.ts`): every scan validates the full body (`SCAN_FRAMING_REGION`, Step 9B);
@@ -131,7 +141,7 @@ src/
   components/form/    form primitives (FormField, FormCard, TextInput, SegmentedControl, ChoiceCards)
   components/icons/   custom Lucide-style icons (clothing)
   components/scan/    ScanViewport (camera + states), BodyGuideOverlay (scan frame + one 3D
-                      reference mannequin), ScanStatus (+ capture progress), ScanPhaseProgress,
+                      reference mannequin), ScanStatus (+ capture progress), ScanCoverage (360° ring),
                       PoseDebugOverlay / PoseDebugPanel (?poseDebug only)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), lazily loaded React wrapper
@@ -144,22 +154,25 @@ src/
                       (user, fit, settings); only display units/theme/voice preference are persisted;
                       user slice holds scanMeasurements (engine output) and measurements (confirmed)
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
-                      useCamera, useFrameQuality, useScanSession, usePoseScan, useVoiceGuidance,
+                      useCamera, useFrameQuality, useScan360Session, usePoseScan, useVoiceGuidance,
                       useMediaQuery, useScrollLock, useWakeLock)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
                       frame analysis, pose/poseLandmarker = MediaPipe engine + mask reader, speech)
   utils/              pure helpers: constants, motion presets, unit conversion,
                       user-info validation, clothing catalog + validation,
-                      scan phases + scan guidance, scanPreview, pose/ (landmarks, orientation,
+                      scan guidance, scanPreview, pose/ (landmarks, orientation,
                       validation + capture hold, config, scanRegions = clothing → body region)
+  utils/scan360/      guided 360° scan: views (angles/windows), bodyYaw, capture (frame decision + view hold),
+                      session (coverage reducer), trackingQuality
   utils/silhouette/   body outline from the segmentation mask: extract (per frame), combine (median profile),
-                      levels (chest/waist/hip/thigh rows, side depth), config; testBody = synthetic mask (tests only)
+                      levels (chest/waist/hip/thigh rows, side depth, angled width), outlineQuality, config;
+                      testBody = synthetic mask incl. angled views (tests only)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),
                       review (edit/confirm rules), silhouetteMeasure (outline girths + inseam);
                       tests + testFixtures (tests only)
   types/domain.ts     domain types (lengths in cm, weight in kg)
-  types/scan.ts       scan/camera types (ScanCapture = landmark snapshot)
+  types/scan.ts       scan/camera types (ScanViewId = 8 views; ScanCapture = landmarks + angle + outline numbers)
   types/pose.ts       pose landmark types
   types/measurement.ts  measurement / calibration / report types
   types/silhouette.ts   body-outline profile types (numbers only, never the mask)
