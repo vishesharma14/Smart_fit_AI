@@ -39,7 +39,7 @@ import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { measureCompletedScan } from '../utils/measurement/fromScan';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
-import { scanRegionFor } from '../utils/pose/scanRegions';
+import { SCAN_FRAMING_REGION } from '../utils/pose/scanRegions';
 import { deriveScanGuidance } from '../utils/scanGuidance';
 import { previewAspectRatio } from '../utils/scanPreview';
 import { SCAN_PHASES, type ScanPhaseDefinition } from '../utils/scanPhases';
@@ -62,8 +62,9 @@ const CAPTURED_MESSAGE_MS = 1000;
 export function BodyScanPage() {
   useDocumentTitle(pageTitle('Body scan'));
   const clothing = useAppStore((s) => s.clothingSelection);
-  // The selected garment decides which body region is validated (full body when nothing is selected).
-  const scanRegion = scanRegionFor(clothing?.type);
+  // Every scan frames the whole body: clothing measurements need the head and feet in view so the entered height
+  // can scale each capture. (The garment still decides which measurements are reviewed.)
+  const scanRegion = SCAN_FRAMING_REGION;
   const camera = useCamera();
   const session = useScanSession();
   const [searchParams] = useSearchParams();
@@ -134,6 +135,7 @@ export function BodyScanPage() {
     quality,
     onCapture: handleCapture,
     delegate: forcedDelegate,
+    debug,
   });
 
   // If the camera stops mid-scan (turned off, unplugged, permission revoked), pause instead of carrying on blind.
@@ -227,6 +229,9 @@ export function BodyScanPage() {
               <p className="scan-page__region-text">
                 {scanRegion.summary} {scanRegion.postureHint}
               </p>
+              <p className="scan-page__region-text scan-page__region-hint">
+                For best accuracy, wear fitted clothing and tie back long hair.
+              </p>
             </div>
           </div>
         </motion.section>
@@ -265,6 +270,7 @@ export function BodyScanPage() {
                   videoHeight={camera.videoRef.current?.videoHeight ?? 0}
                   mirrored={camera.facingMode === 'user'}
                   valid={pose.assessment?.issue === null}
+                  silhouette={pose.silhouette}
                 />
               )
             }
@@ -343,9 +349,10 @@ export function BodyScanPage() {
           <ShieldCheck className="scan-page__privacy-icon" aria-hidden="true" size={20} strokeWidth={1.75} />
           <span>
             <strong>Your camera is used for body scanning.</strong> The video is analysed on this device only: for
-            lighting, movement and your body pose (joint positions). Video frames are not uploaded or saved; only the
-            detected joint positions for each angle are kept in memory. Measurements are calculated from those joint
-            positions on this device, and the camera turns off when you leave this page.
+            lighting, movement, your body pose (joint positions) and your body outline. Video frames and the outline
+            image are not uploaded or saved; for each angle only the detected joint positions and the outline’s edge
+            positions (numbers) are kept in memory. Measurements are calculated from them on this device, and the camera
+            turns off when you leave this page.
           </span>
         </motion.p>
       </motion.div>
@@ -423,7 +430,8 @@ function PoseEngineNote({ pose }: { pose: PoseScanState }) {
       <span>
         <strong>{pose.status === 'ready' ? 'On-device pose detection active.' : 'Loading on-device pose detection…'}</strong>{' '}
         Your body position and angle are checked from detected joint positions, and each angle is captured only when the
-        pose is confirmed. Measurements are calculated from the captured joint positions once all angles are done.
+        pose is confirmed. Measurements are calculated from the captured joint positions and body outline once all
+        angles are done.
       </span>
     </p>
   );

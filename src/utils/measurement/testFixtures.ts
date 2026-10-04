@@ -1,6 +1,9 @@
 import type { PoseLandmark } from '../../types/pose';
 import type { ScanCapture, ScanPhaseId } from '../../types/scan';
 import { LM } from '../pose/landmarks';
+import { combineSilhouetteFrames } from '../silhouette/combine';
+import { extractSilhouetteFrame } from '../silhouette/extract';
+import { bodyLandmarks, renderBodyMask, type BodyOptions } from '../silhouette/testBody';
 
 /*
  * Test-only fixtures: a synthetic upright pose with known joint geometry
@@ -88,4 +91,32 @@ export function makeCaptures(
   overrides: Parameters<typeof makeCapture>[1] = {},
 ): Partial<Record<ScanPhaseId, ScanCapture>> {
   return Object.fromEntries(phases.map((phase) => [phase, makeCapture(phase, overrides)]));
+}
+
+/**
+ * A capture whose image landmarks and body outline come from the synthetic
+ * body in `silhouette/testBody.ts` (rendered masks, run through the real
+ * extraction and median), with the standing 3D joints for joint lengths.
+ * `frames` renders one mask per entry (default: three identical frames).
+ */
+export function makeSilhouetteCapture(
+  phase: ScanPhaseId,
+  body: BodyOptions = {},
+  frames: BodyOptions[] = [body, body, body],
+): ScanCapture {
+  const outline = combineSilhouetteFrames(
+    frames.map((options) => extractSilhouetteFrame(renderBodyMask(phase, options), bodyLandmarks(phase, options))),
+  );
+  return {
+    ...makeCapture(phase),
+    landmarks: bodyLandmarks(phase, body),
+    ...(outline ? { silhouette: outline } : {}),
+  };
+}
+
+export function makeSilhouetteCaptures(
+  phases: ScanPhaseId[] = ['front', 'left', 'back', 'right'],
+  body: BodyOptions = {},
+): Partial<Record<ScanPhaseId, ScanCapture>> {
+  return Object.fromEntries(phases.map((phase) => [phase, makeSilhouetteCapture(phase, body)]));
 }

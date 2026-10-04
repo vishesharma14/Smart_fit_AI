@@ -2,18 +2,19 @@ import type { MeasurementId } from '../../types/measurement';
 import type { ScanCapture, ScanPhaseId } from '../../types/scan';
 import { LM } from '../pose/landmarks';
 import type { ScanRegionId } from '../pose/scanRegions';
+import type { LevelId } from '../silhouette/levels';
 import type { AngleSample } from './aggregate';
 import { distance, midpoint, minVisibility, pathLength, visibleLandmarks } from './geometry';
 
 /*
- * Which measurements exist, for which scan region, and how each is taken from
- * one captured angle.
+ * Which measurements exist, for which scan region, and how each is taken.
  *
- * Joint landmarks give the positions of joint centres, so they support
- * lengths between joints (shoulder width, arm, torso, leg). They say nothing
- * about the body's surface, so girths (chest, waist, hip, thigh) and points
- * that aren't landmarks (the crotch, for inseam) are declared `unsupported`
- * with the reason, rather than estimated.
+ * - `landmark`: lengths between joint centres (shoulder width, arm, torso,
+ *   leg), one sample per captured angle from the 3D joint positions.
+ * - `silhouette`: girths (chest, waist, hip, thigh) and inseam from the body
+ *   outline — joints say nothing about the body's surface or the crotch
+ *   (see silhouetteMeasure.ts).
+ * - `unsupported`: declared with the reason rather than estimated.
  */
 
 /** Landmarks a sample uses must be at least this visible in that capture. */
@@ -26,8 +27,8 @@ interface BaseDefinition {
   regions: ScanRegionId[];
 }
 
-export interface SupportedDefinition extends BaseDefinition {
-  supported: true;
+export interface LandmarkDefinition extends BaseDefinition {
+  kind: 'landmark';
   /** Angles whose captures may contribute (others would foreshorten or hide the landmarks). */
   angles: ScanPhaseId[];
   landmarks: string[];
@@ -35,12 +36,21 @@ export interface SupportedDefinition extends BaseDefinition {
   sample: (capture: ScanCapture) => AngleSample[];
 }
 
+export type SilhouetteFeature = LevelId | 'inseam';
+
+export interface SilhouetteDefinition extends BaseDefinition {
+  kind: 'silhouette';
+  feature: SilhouetteFeature;
+  /** What the value is based on (shown as the measurement's source). */
+  landmarks: string[];
+}
+
 export interface UnsupportedDefinition extends BaseDefinition {
-  supported: false;
+  kind: 'unsupported';
   reason: string;
 }
 
-export type MeasurementDefinition = SupportedDefinition | UnsupportedDefinition;
+export type MeasurementDefinition = LandmarkDefinition | SilhouetteDefinition | UnsupportedDefinition;
 
 /** A path through landmarks in one capture, if they are all clearly visible. */
 function pathSample(capture: ScanCapture, indices: readonly number[]): AngleSample | null {
@@ -54,8 +64,7 @@ function eachSide(capture: ScanCapture, left: readonly number[], right: readonly
   return [pathSample(capture, left), pathSample(capture, right)].filter((s): s is AngleSample => s !== null);
 }
 
-const GIRTH_REASON =
-  'Needs the outline of the body at that height (front and side silhouette). The scan stores joint positions only, which do not describe body girth.';
+const GIRTH_SOURCE = ['body outline: front / back width', 'body outline: side depth', 'entered height (scale)'];
 
 export const MEASUREMENT_DEFINITIONS: MeasurementDefinition[] = [
   {
@@ -63,7 +72,7 @@ export const MEASUREMENT_DEFINITIONS: MeasurementDefinition[] = [
     name: 'Shoulder width',
     definition: 'Distance between the left and right shoulder joint centres (narrower than an outside-edge shoulder measurement).',
     regions: ['full', 'upper'],
-    supported: true,
+    kind: 'landmark',
     // Both shoulders are only clearly visible facing toward or away from the camera.
     angles: ['front', 'back'],
     landmarks: ['left_shoulder', 'right_shoulder'],
@@ -77,7 +86,7 @@ export const MEASUREMENT_DEFINITIONS: MeasurementDefinition[] = [
     name: 'Arm length',
     definition: 'Shoulder joint → elbow → wrist, along the arm.',
     regions: ['full', 'upper'],
-    supported: true,
+    kind: 'landmark',
     // Side views show the near arm clearly; front and back show both.
     angles: ['front', 'left', 'back', 'right'],
     landmarks: ['shoulder', 'elbow', 'wrist'],
@@ -93,7 +102,7 @@ export const MEASUREMENT_DEFINITIONS: MeasurementDefinition[] = [
     name: 'Torso length',
     definition: 'Midpoint between the shoulder joints → midpoint between the hip joints.',
     regions: ['full', 'upper'],
-    supported: true,
+    kind: 'landmark',
     angles: ['front', 'back'],
     landmarks: ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip'],
     sample: (capture) => {
@@ -107,41 +116,49 @@ export const MEASUREMENT_DEFINITIONS: MeasurementDefinition[] = [
   {
     id: 'chest',
     name: 'Chest',
-    definition: 'Chest circumference.',
+    definition:
+      'Chest circumference at its fullest below the armpits, estimated as an ellipse from the front/back width and side depth of your outline.',
     regions: ['full', 'upper'],
-    supported: false,
-    reason: GIRTH_REASON,
+    kind: 'silhouette',
+    feature: 'chest',
+    landmarks: GIRTH_SOURCE,
   },
   {
     id: 'waist',
     name: 'Waist',
-    definition: 'Waist circumference.',
+    definition:
+      'Waist circumference at the narrowest point between chest and hips, estimated as an ellipse from the front/back width and side depth of your outline.',
     regions: ['full', 'upper', 'lower'],
-    supported: false,
-    reason: GIRTH_REASON,
+    kind: 'silhouette',
+    feature: 'waist',
+    landmarks: GIRTH_SOURCE,
   },
   {
     id: 'hip',
     name: 'Hip',
-    definition: 'Hip circumference.',
+    definition:
+      'Hip circumference at the widest point between the hip joints and the crotch, estimated as an ellipse from the front/back width and side depth of your outline.',
     regions: ['full', 'lower'],
-    supported: false,
-    reason: GIRTH_REASON,
+    kind: 'silhouette',
+    feature: 'hip',
+    landmarks: GIRTH_SOURCE,
   },
   {
     id: 'thigh',
     name: 'Thigh',
-    definition: 'Thigh circumference.',
+    definition:
+      'Upper-thigh circumference just below the crotch, estimated as an ellipse from one leg’s front/back width and the side depth of your outline.',
     regions: ['full', 'lower'],
-    supported: false,
-    reason: GIRTH_REASON,
+    kind: 'silhouette',
+    feature: 'thigh',
+    landmarks: GIRTH_SOURCE,
   },
   {
     id: 'leg-length',
     name: 'Leg length',
     definition: 'Hip joint → knee → ankle, along the leg (outside leg length to the ankle, from the hip joint).',
     regions: ['full', 'lower'],
-    supported: true,
+    kind: 'landmark',
     angles: ['front', 'left', 'back', 'right'],
     landmarks: ['hip', 'knee', 'ankle'],
     sample: (capture) =>
@@ -150,11 +167,12 @@ export const MEASUREMENT_DEFINITIONS: MeasurementDefinition[] = [
   {
     id: 'inseam',
     name: 'Inseam',
-    definition: 'Crotch to ankle along the inside of the leg.',
+    definition:
+      'Crotch to floor (top of the gap between your legs to the floor) from the front/back outline. A trouser inseam is usually a little shorter.',
     regions: ['full', 'lower'],
-    supported: false,
-    reason:
-      'Needs the crotch point, which is not a pose landmark. Leg length (hip joint to ankle) is measured instead; inseam would need the body outline.',
+    kind: 'silhouette',
+    feature: 'inseam',
+    landmarks: ['body outline: crotch and floor', 'entered height (scale)'],
   },
 ];
 

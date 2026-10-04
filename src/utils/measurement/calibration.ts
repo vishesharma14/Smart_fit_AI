@@ -136,3 +136,53 @@ export function applyCalibration(
   if (calibration.cmPerUnit === null) return { value: valueUnits, unit: 'model-units' };
   return { value: valueUnits * calibration.cmPerUnit, unit: 'cm' };
 }
+
+/**
+ * The joints only give a rough stature (the head top is extrapolated above the ears), so the outline's stature may
+ * differ from it by this much without penalty, and is distrusted beyond the maximum.
+ */
+export const SILHOUETTE_STATURE_TOLERANCE = 0.1;
+export const SILHOUETTE_STATURE_MAX_DISAGREEMENT = 0.25;
+
+export interface SilhouetteScale {
+  cmPerPx: number;
+  /** 0–1 trust in this capture's scale. */
+  confidence: number;
+}
+
+/**
+ * Per-capture scale for outline measurements: the entered height ÷ the
+ * outline's head top → floor distance in that capture. Each capture gets its
+ * own scale, so stepping slightly nearer or further between angles doesn't
+ * matter. Null without a plausible height, without an outline, when the head
+ * or feet are cut off, or when the outline's height disagrees strongly with
+ * the joints (e.g. a background object merged into the outline).
+ */
+export function silhouetteScale(capture: ScanCapture, userHeightCm: number | null | undefined): SilhouetteScale | null {
+  if (typeof userHeightCm !== 'number' || !Number.isFinite(userHeightCm)) return null;
+  if (userHeightCm < HEIGHT_RANGE_CM.min || userHeightCm > HEIGHT_RANGE_CM.max) return null;
+  const outline = capture.silhouette;
+  if (!outline || outline.headTopY === null || outline.floorY === null || outline.headClipped || outline.floorClipped) return null;
+  const staturePx = outline.floorY - outline.headTopY;
+  if (!(staturePx > 0)) return null;
+
+  // Rough cross-check from the joints, in the same mask pixels: head top extrapolated above the ears, to the heels.
+  const y = (i: number) => capture.landmarks[i]?.y * outline.height;
+  const earY = (y(LM.leftEar) + y(LM.rightEar)) / 2;
+  const shoulderY = (y(LM.leftShoulder) + y(LM.rightShoulder)) / 2;
+  const heelY = (y(LM.leftHeel) + y(LM.rightHeel)) / 2;
+  const jointStature = heelY - (earY + HEAD_TOP_FACTOR * (earY - shoulderY));
+  if (!(jointStature > 0)) return null;
+  const disagreement = Math.abs(staturePx - jointStature) / staturePx;
+  if (disagreement > SILHOUETTE_STATURE_MAX_DISAGREEMENT) return null;
+
+  return {
+    cmPerPx: userHeightCm / staturePx,
+    confidence: combineConfidence([
+      USER_HEIGHT_CONFIDENCE,
+      1 -
+        Math.max(0, disagreement - SILHOUETTE_STATURE_TOLERANCE) /
+          (SILHOUETTE_STATURE_MAX_DISAGREEMENT - SILHOUETTE_STATURE_TOLERANCE),
+    ]),
+  };
+}

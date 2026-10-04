@@ -37,11 +37,16 @@ export type MeasurementStatus = 'valid' | 'uncertain' | 'invalid' | 'unsupported
 export type MeasurementUnit = 'cm' | 'model-units';
 
 /** How real-world scale was established. */
-export type CalibrationMethod = 'user-height' | 'pose-model-metric' | 'none';
+/**
+ * - `user-height`: entered height ÷ stature from the 3D landmarks (joint lengths)
+ * - `silhouette-height`: entered height ÷ head-top-to-floor of each capture's body outline, per capture (outline measurements)
+ * - `pose-model-metric` / `none`: fallbacks for joint lengths
+ */
+export type CalibrationMethod = 'user-height' | 'silhouette-height' | 'pose-model-metric' | 'none';
 
 export interface MeasurementSource {
   /** How the value was derived. */
-  method: 'landmark-geometry' | 'not-measurable';
+  method: 'landmark-geometry' | 'silhouette-geometry' | 'not-measurable';
   /** Captured angles that contributed a usable sample. */
   angles: ScanPhaseId[];
   /** Number of individual samples combined (e.g. both arms in the front view). */

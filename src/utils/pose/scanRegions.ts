@@ -153,7 +153,7 @@ export const SCAN_REGIONS: Record<ScanRegionId, ScanRegionDefinition> = {
   },
 };
 
-/** The body region each garment is scanned for. */
+/** The body region each garment is measured for (which measurements apply). */
 export const CLOTHING_SCAN_REGION: Record<ClothingType, ScanRegionId> = {
   't-shirt': 'upper',
   shirt: 'upper',
@@ -162,7 +162,15 @@ export const CLOTHING_SCAN_REGION: Record<ClothingType, ScanRegionId> = {
   trousers: 'lower',
 };
 
-/** Region for the selected clothing; a full-body scan when nothing is selected. */
+/** Measurement region for the selected clothing; the full body when nothing is selected. */
 export function scanRegionFor(type: ClothingType | null | undefined): ScanRegionDefinition {
   return SCAN_REGIONS[type ? CLOTHING_SCAN_REGION[type] : 'full'];
 }
+
+/**
+ * Region every scan validates: the full body, whatever the garment. Clothing
+ * measurements need the head and feet in view in every capture, so the entered
+ * height can scale each capture's body outline. The upper / lower definitions
+ * stay available for the measurement region and its copy.
+ */
+export const SCAN_FRAMING_REGION: ScanRegionDefinition = SCAN_REGIONS.full;

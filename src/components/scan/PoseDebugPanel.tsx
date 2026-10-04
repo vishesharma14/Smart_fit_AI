@@ -17,7 +17,7 @@ interface PoseDebugPanelProps {
 }
 
 export function PoseDebugPanel({ pose, camera, scanRegion, captures }: PoseDebugPanelProps) {
-  const { assessment, stats } = pose;
+  const { assessment, stats, silhouette } = pose;
   const orientation = assessment?.orientation;
   const metrics = assessment?.metrics;
   const { videoSize, zoom } = camera;
@@ -61,9 +61,33 @@ export function PoseDebugPanel({ pose, camera, scanRegion, captures }: PoseDebug
     ['Jitter', `${fixed(pose.jitter, 3)}${pose.moving ? ' (moving)' : ''}`],
     ['Hold', fixed(pose.holdProgress)],
     [
+      'Outline',
+      silhouette
+        ? `${silhouette.width}×${silhouette.height} · stature ${
+            silhouette.headTopY !== null && silhouette.floorY !== null ? fixed(silhouette.floorY - silhouette.headTopY, 0) : '–'
+          } px${silhouette.headClipped ? ' · head cut off' : ''}${silhouette.floorClipped ? ' · feet cut off' : ''} · crotch ${
+            silhouette.crotchY !== null ? fixed(silhouette.crotchY, 0) : '–'
+          } · ${stats?.silhouetteMs != null ? `${fixed(stats.silhouetteMs, 1)} ms` : '–'}`
+        : 'none',
+    ],
+    [
       'Saved captures',
       Object.values(captures)
         .map((c) => `${c.phase}: ${c.sampleCount} frames / ${Math.round(c.holdMs)} ms`)
+        .join(' · ') || 'none',
+    ],
+    [
+      'Saved outlines',
+      Object.values(captures)
+        .map((c) =>
+          c.silhouette
+            ? `${c.phase}: ${c.silhouette.frameCount} frames · jitter ${fixed(c.silhouette.widthJitter, 3)} · stature ${
+                c.silhouette.headTopY !== null && c.silhouette.floorY !== null
+                  ? fixed(c.silhouette.floorY - c.silhouette.headTopY, 0)
+                  : '–'
+              } px`
+            : `${c.phase}: none`,
+        )
         .join(' · ') || 'none',
     ],
   ];

@@ -1,7 +1,8 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { createPoseEngine, type PoseEngine } from '../services/pose/poseLandmarker';
-import type { PoseDelegate, PoseEngineStatus } from '../types/pose';
+import { createPoseEngine, type MaskView, type PoseEngine } from '../services/pose/poseLandmarker';
+import type { PoseDelegate, PoseEngineStatus, PoseLandmark } from '../types/pose';
 import type { FrameQuality, ScanCapture, ScanPhaseId } from '../types/scan';
+import type { SilhouetteFrame } from '../types/silhouette';
 import { visibleRegion } from '../utils/pose/landmarks';
 import { POSE_SCAN_CONFIG } from '../utils/pose/poseConfig';
 import type { CoarseView, OrientationCalibration } from '../utils/pose/poseOrientation';
@@ -18,12 +19,16 @@ import {
   type StillnessSample,
   type ValidatedSample,
 } from '../utils/pose/poseValidation';
+import { combineSilhouetteFrames } from '../utils/silhouette/combine';
+import { extractSilhouetteFrame } from '../utils/silhouette/extract';
 
 export interface PoseStats {
   /** Average time the model took per frame over the last few runs, in ms. */
   inferenceMs: number;
   /** Pose model runs completed in the last second. */
   detectionsPerSecond: number;
+  /** Average time spent reading the mask and extracting the outline (frames where it was read), in ms. */
+  silhouetteMs: number | null;
 }
 
 export interface PoseScanState {
@@ -37,6 +42,8 @@ export interface PoseScanState {
   /** 0–1 progress toward auto-capture of the current angle. */
   holdProgress: number;
   stats: PoseStats | null;
+  /** Latest frame's body outline (developer view only; null otherwise). */
+  silhouette: SilhouetteFrame | null;
   /** Try loading the pose model again after an error. */
   retry: () => void;
 }
@@ -57,6 +64,8 @@ interface UsePoseScanOptions {
   intervalMs?: number;
   /** Force the GPU or CPU delegate (testing only). */
   delegate?: PoseDelegate;
+  /** Developer view: read the outline on every analysed frame and expose it. */
+  debug?: boolean;
 }
 
 interface LiveState {
@@ -65,9 +74,10 @@ interface LiveState {
   jitter: number | null;
   holdProgress: number;
   stats: PoseStats | null;
+  silhouette: SilhouetteFrame | null;
 }
 
-const IDLE_LIVE: LiveState = { assessment: null, moving: false, jitter: null, holdProgress: 0, stats: null };
+const IDLE_LIVE: LiveState = { assessment: null, moving: false, jitter: null, holdProgress: 0, stats: null, silhouette: null };
 const STATS_WINDOW = 20;
 const MIN_STILLNESS_SAMPLES = 3;
 /**
@@ -82,6 +92,12 @@ const MIN_IDLE_MS = 40;
  * the camera is on, analyses about ten frames per second while scanning,
  * validates the pose for the current angle, and calls `onCapture` with a
  * landmark snapshot once the pose has been valid and still for the hold time.
+ *
+ * During a hold it also reads the person's segmentation mask, turns it into
+ * outline numbers inside the model call (the mask itself is never kept) and
+ * adds their per-row median to the capture. The outline never decides
+ * whether or when an angle is captured: a missing or poor outline only
+ * leaves the capture without one.
  */
 export function usePoseScan({
   videoRef,
@@ -94,6 +110,7 @@ export function usePoseScan({
   onCapture,
   intervalMs = POSE_SCAN_CONFIG.inferenceIntervalMs,
   delegate: preferredDelegate,
+  debug = false,
 }: UsePoseScanOptions): PoseScanState {
   const [engine, setEngine] = useState<PoseEngine | null>(null);
   const [failed, setFailed] = useState(false);
@@ -161,6 +178,7 @@ export function usePoseScan({
     const stillness = stillnessRef.current;
     const timings: number[] = [];
     const runTimes: number[] = [];
+    const silhouetteTimings: number[] = [];
 
     const tick = (now: number) => {
       if (captured) return;
@@ -174,12 +192,26 @@ export function usePoseScan({
       const timestamp = Math.max(Math.round(now), lastTimestamp + 1);
       lastTimestamp = timestamp;
       const started = performance.now();
+      // The outline is only needed while a hold is under way (the previous frame was valid), or in the developer view.
+      const outline: { frame: SilhouetteFrame | null } = { frame: null };
+      const readMask =
+        debug || hold.frames > 0
+          ? (mask: MaskView, index: number, landmarks: PoseLandmark[]) => {
+              if (index !== 0) return;
+              const begun = performance.now();
+              outline.frame = extractSilhouetteFrame(mask, landmarks);
+              silhouetteTimings.push(performance.now() - begun);
+              if (silhouetteTimings.length > STATS_WINDOW) silhouetteTimings.shift();
+            }
+          : undefined;
       let frame;
       try {
-        frame = engine.detect(video, timestamp);
+        frame = engine.detect(video, timestamp, readMask);
       } catch {
         return;
       }
+      // Only one person's outline can be trusted (the scan requires one person anyway).
+      const silhouette = frame.landmarks.length === 1 ? outline.frame : null;
       lastEnd = performance.now();
       lastDuration = lastEnd - started;
       timings.push(lastDuration);
@@ -214,7 +246,7 @@ export function usePoseScan({
 
       const validSample: ValidatedSample | null =
         valid && assessment.landmarks && assessment.worldLandmarks
-          ? { time: now, landmarks: assessment.landmarks, worldLandmarks: assessment.worldLandmarks }
+          ? { time: now, landmarks: assessment.landmarks, worldLandmarks: assessment.worldLandmarks, silhouette }
           : null;
       hold = stepHold(hold, validSample !== null, now);
       if (validSample) {
@@ -229,6 +261,8 @@ export function usePoseScan({
         if (result) {
           captured = true;
           cancelAnimationFrame(frameId);
+          // Median outline of the hold frames; null (no outline) never blocks the capture.
+          const profile = combineSilhouetteFrames(holdSamples.map((sample) => sample.silhouette));
           onCaptureRef.current(target, {
             phase: target,
             capturedAt: Date.now(),
@@ -238,6 +272,7 @@ export function usePoseScan({
             scanRegion: scanRegion.id,
             widthRatio: assessment.orientation.widthRatio,
             orientationConfidence: assessment.orientation.confidence,
+            ...(profile ? { silhouette: profile } : {}),
           });
         }
         // Either way the hold starts over; an untrustworthy buffer is discarded, never saved.
@@ -255,7 +290,11 @@ export function usePoseScan({
           stats: {
             inferenceMs: timings.reduce((sum, value) => sum + value, 0) / timings.length,
             detectionsPerSecond: runTimes.length,
+            silhouetteMs: silhouetteTimings.length
+              ? silhouetteTimings.reduce((sum, value) => sum + value, 0) / silhouetteTimings.length
+              : null,
           },
+          silhouette: debug ? silhouette : null,
         }),
       );
     };
@@ -267,7 +306,7 @@ export function usePoseScan({
       // Never show a stale result after pausing or moving to the next angle.
       setLive(IDLE_LIVE);
     };
-  }, [engine, scanning, target, scanRegion, calibrationRatio, intervalMs, videoRef]);
+  }, [engine, scanning, target, scanRegion, calibrationRatio, intervalMs, videoRef, debug]);
 
   const retry = useCallback(() => {
     setFailed(false);

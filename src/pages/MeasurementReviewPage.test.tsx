@@ -6,7 +6,7 @@ import { PATHS } from '../routes/paths';
 import { useAppStore } from '../store/useAppStore';
 import type { ScanMeasurementResult } from '../types/measurement';
 import { measureScan } from '../utils/measurement/measureScan';
-import { makeCaptures } from '../utils/measurement/testFixtures';
+import { makeCaptures, makeSilhouetteCaptures } from '../utils/measurement/testFixtures';
 import { MeasurementReviewPage } from './MeasurementReviewPage';
 
 // Real Step 7 engine output from synthetic captures of known geometry (tests only).
@@ -16,6 +16,16 @@ function scanResult(userHeightCm: number | null, region: 'full' | 'upper' = 'ful
     clothingType: region === 'upper' ? 't-shirt' : null,
     measuredAt: `2026-01-01T00:00:0${userHeightCm ? 1 : 2}.000Z`,
   };
+}
+
+/** The same result with chest marked unsupported (test-only: no current definition is unsupported). */
+function withUnsupportedChest(result: ScanMeasurementResult): ScanMeasurementResult {
+  const measurements = result.report.measurements.map((m) =>
+    m.id === 'chest'
+      ? { ...m, status: 'unsupported' as const, value: null, confidence: 0, reason: 'Body circumference cannot be derived here.' }
+      : m,
+  );
+  return { ...result, report: { ...result.report, measurements } };
 }
 
 function renderReview() {
@@ -58,7 +68,7 @@ describe('MeasurementReviewPage', () => {
   });
 
   it('shows unsupported measurements as unavailable with their reason, never a number', () => {
-    useAppStore.getState().setScanMeasurements(scanResult(170));
+    useAppStore.getState().setScanMeasurements(withUnsupportedChest(scanResult(170)));
     renderReview();
     const chest = item('Chest');
     expect(within(chest).getByText('Currently unavailable')).toBeTruthy();
@@ -103,14 +113,41 @@ describe('MeasurementReviewPage', () => {
     expect(within(row).queryByText('Edited by you')).toBeNull();
   });
 
-  it('offers no input for unsupported measurements', () => {
-    useAppStore.getState().setScanMeasurements(scanResult(170));
+  it('offers no input for unsupported or invalid measurements', () => {
+    // Joint-only captures: outline measurements are invalid; chest is additionally marked unsupported.
+    useAppStore.getState().setScanMeasurements(withUnsupportedChest(scanResult(170)));
     renderReview();
     fireEvent.click(screen.getByRole('button', { name: 'Edit Measurements' }));
-    for (const name of ['Chest', 'Waist', 'Hip', 'Thigh', 'Inseam']) {
+    expect(within(item('Chest')).queryByRole('textbox')).toBeNull();
+    expect(within(item('Chest')).getByText('Currently unavailable')).toBeTruthy();
+    for (const name of ['Waist', 'Hip', 'Thigh', 'Inseam']) {
       expect(within(item(name)).queryByRole('textbox')).toBeNull();
-      expect(within(item(name)).getByText('Currently unavailable')).toBeTruthy();
+      expect(within(item(name)).getByText('Not measured')).toBeTruthy();
+      expect(within(item(name)).getByText('Invalid')).toBeTruthy();
     }
+  });
+
+  it('shows outline measurements as uncertain values that stay uncertain after an edit', () => {
+    const result: ScanMeasurementResult = {
+      report: measureScan({ captures: makeSilhouetteCaptures(), region: 'full', userHeightCm: 175 }),
+      clothingType: null,
+      measuredAt: '2026-01-01T00:00:03.000Z',
+    };
+    useAppStore.getState().setScanMeasurements(result);
+    renderReview();
+    const chest = result.report.measurements.find((m) => m.id === 'chest')!;
+    expect(chest.value).not.toBeNull();
+    const row = item('Chest');
+    expect(row.querySelector('.measure-item__value')!.textContent).toBe(`${chest.value!.toLocaleString('en', { maximumFractionDigits: 1 })} cm`);
+    expect(within(row).getByText('Uncertain')).toBeTruthy();
+    expect(within(row).getByText(/not yet validated against tape measurements/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Measurements' }));
+    fireEvent.change(within(item('Chest')).getByRole('textbox'), { target: { value: '92' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Measurements' }));
+    const confirmed = useAppStore.getState().measurements!.measurements.find((m) => m.id === 'chest')!;
+    expect(confirmed).toMatchObject({ value: 92, status: 'uncertain', manuallyEdited: true, measuredValue: chest.value });
   });
 
   it('keeps uncertain measurements labelled uncertain, also after an edit', () => {

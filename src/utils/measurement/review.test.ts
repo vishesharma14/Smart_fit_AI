@@ -67,6 +67,9 @@ describe('isEditable / applyEdit', () => {
   it('never gives an unsupported or invalid measurement a value', () => {
     const chest = byId(reviewed, 'chest');
     expect(applyEdit(chest, 95)).toBe(chest);
+    const unsupported: ReviewedMeasurement = { ...chest, status: 'unsupported', reason: 'Not measurable.' };
+    expect(isEditable(unsupported)).toBe(false);
+    expect(applyEdit(unsupported, 95)).toBe(unsupported);
     const invalid: ReviewedMeasurement = { ...byId(reviewed, 'arm-length'), status: 'invalid', value: null, measuredValue: null };
     expect(applyEdit(invalid, 60)).toBe(invalid);
   });
@@ -113,7 +116,7 @@ describe('confirmMeasurements', () => {
     expect(confirmed.measurements).toHaveLength(report.measurements.length);
     const shoulders = byId(confirmed.measurements, 'shoulder-width');
     expect(shoulders).toMatchObject({ name: 'Shoulder width', value: 44, unit: 'cm', status: 'valid', manuallyEdited: true });
-    expect(byId(confirmed.measurements, 'chest')).toMatchObject({ value: null, status: 'unsupported', manuallyEdited: false });
+    expect(byId(confirmed.measurements, 'chest')).toMatchObject({ value: null, status: 'invalid', manuallyEdited: false });
   });
 });
 

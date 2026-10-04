@@ -1,5 +1,6 @@
 import type { PoseFrame, PoseLandmark } from '../../types/pose';
 import type { ScanPhaseId } from '../../types/scan';
+import type { SilhouetteFrame } from '../../types/silhouette';
 import { POSE_SCAN_CONFIG, type PoseScanConfig } from './poseConfig';
 import { LM, mid, toPixels, type Point, type VisibleRegion } from './landmarks';
 import { estimateOrientation, type CoarseView, type OrientationCalibration, type OrientationEstimate } from './poseOrientation';
@@ -378,6 +379,8 @@ export interface ValidatedSample {
   time: number;
   landmarks: PoseLandmark[];
   worldLandmarks: PoseLandmark[];
+  /** This frame's body outline, when its mask was read and usable. Never part of the validity decision. */
+  silhouette?: SilhouetteFrame | null;
 }
 
 /**

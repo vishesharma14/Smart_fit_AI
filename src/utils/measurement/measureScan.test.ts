@@ -17,16 +17,23 @@ describe('measureScan – regions', () => {
     expect(report.measurements.map((m) => m.id)).toEqual(['waist', 'hip', 'thigh', 'leg-length', 'inseam']);
   });
 
-  it('never gives a value for girths or inseam', () => {
+  it('never gives girths or inseam a value without a body outline', () => {
+    // These captures carry joints only (no outline): outline measurements can't be taken, and aren't guessed.
     const report = measureScan({ captures: makeCaptures(), region: 'full', userHeightCm: 170 });
     for (const id of ['chest', 'waist', 'hip', 'thigh', 'inseam'] as const) {
       const m = byId(report.measurements, id);
-      expect(m.status).toBe('unsupported');
+      expect(m.status).toBe('invalid');
       expect(m.value).toBeNull();
       expect(m.confidence).toBe(0);
-      expect(m.source.method).toBe('not-measurable');
+      expect(m.source.method).toBe('silhouette-geometry');
       expect(m.reason).toBeTruthy();
     }
+  });
+
+  it('accepts full-body captures for the upper and lower regions', () => {
+    const report = measureScan({ captures: makeCaptures(), region: 'upper', userHeightCm: 170 });
+    expect(report.anglesUsed).toEqual(['front', 'left', 'back', 'right']);
+    expect(report.warnings).toEqual([]);
   });
 });
 

@@ -1,8 +1,10 @@
 import type { PoseLandmark } from './pose';
+import type { SilhouetteProfile } from './silhouette';
 
 /**
  * Types for the body-scan step. Nothing here holds measurements: the scan
- * guides the user and keeps only the pose landmarks the model actually detected.
+ * guides the user and keeps only the pose landmarks the model actually detected
+ * and the outline numbers derived from its segmentation mask.
  */
 
 export type ScanPhaseId = 'front' | 'left' | 'back' | 'right';
@@ -16,7 +18,8 @@ export type ScanPhaseStatus = 'pending' | 'active' | 'captured';
 
 /**
  * What is kept when an angle is captured: pose landmarks averaged over the
- * hold, never an image. Kept in memory on the scan page only.
+ * hold and (when available) the body-outline profile, never an image or mask.
+ * Kept in memory only.
  */
 export interface ScanCapture {
   /** Angle this capture was validated for (always the angle that was active at the time). */
@@ -38,6 +41,11 @@ export interface ScanCapture {
   widthRatio: number;
   /** Orientation agreement (0–1) at capture. */
   orientationConfidence: number;
+  /**
+   * Body outline (edge positions per row, median over the hold frames), when the segmentation mask was usable.
+   * Numbers only — never the mask or an image. Its absence never prevents a capture.
+   */
+  silhouette?: SilhouetteProfile;
 }
 
 /** Overall scan session state. */
