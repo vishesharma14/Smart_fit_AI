@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import {
   ArrowLeft,
+  ArrowRight,
   Cpu,
   Pause,
   Play,
@@ -36,6 +37,7 @@ import { PATHS } from '../routes/paths';
 import { useAppStore } from '../store/useAppStore';
 import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
+import { measureCompletedScan } from '../utils/measurement/fromScan';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { scanRegionFor } from '../utils/pose/scanRegions';
 import { deriveScanGuidance } from '../utils/scanGuidance';
@@ -177,6 +179,15 @@ export function BodyScanPage() {
     : null;
   const showPhaseOnPreview = session.status === 'scanning' || session.status === 'paused';
 
+  // All four angles captured: run the measurement engine on the captures and open the review.
+  const navigate = useNavigate();
+  const userHeightCm = useAppStore((s) => s.userInfo.heightCm);
+  const setScanMeasurements = useAppStore((s) => s.setScanMeasurements);
+  const reviewMeasurements = () => {
+    setScanMeasurements(measureCompletedScan({ captures: session.captures, clothingType: clothing?.type, userHeightCm }));
+    navigate(PATHS.measurements);
+  };
+
   return (
     <div ref={pageRef} className="scan-page">
       <motion.div
@@ -274,7 +285,7 @@ export function BodyScanPage() {
                 </>
               )}
               <div className="scan-page__camera-actions">
-                {immersive && <ScanControls session={session} compact />}
+                {immersive && <ScanControls session={session} onReview={reviewMeasurements} compact />}
                 {camera.canSwitch && (
                   <Button variant="secondary" onClick={camera.switchCamera} aria-label={immersive ? 'Switch camera' : undefined}>
                     <SwitchCamera aria-hidden="true" size={18} />
@@ -323,7 +334,7 @@ export function BodyScanPage() {
             <ScanPhaseProgress phases={session.phases} />
           </div>
 
-          {cameraActive && !immersive && <ScanControls session={session} />}
+          {cameraActive && !immersive && <ScanControls session={session} onReview={reviewMeasurements} />}
 
           {debug && cameraActive && <PoseDebugPanel pose={pose} camera={camera} scanRegion={scanRegion} captures={session.captures} />}
         </motion.section>
@@ -333,8 +344,8 @@ export function BodyScanPage() {
           <span>
             <strong>Your camera is used for body scanning.</strong> The video is analysed on this device only: for
             lighting, movement and your body pose (joint positions). Video frames are not uploaded or saved; only the
-            detected joint positions for each angle are kept in memory on this page. No measurements are estimated yet,
-            and the camera turns off when you leave this page.
+            detected joint positions for each angle are kept in memory. Measurements are calculated from those joint
+            positions on this device, and the camera turns off when you leave this page.
           </span>
         </motion.p>
       </motion.div>
@@ -344,6 +355,8 @@ export function BodyScanPage() {
 
 interface ScanControlsProps {
   session: UseScanSession;
+  /** Runs the measurement engine on the completed scan and opens the review. */
+  onReview: () => void;
   /** Shorter labels for the full-screen phone control bar. */
   compact?: boolean;
 }
@@ -352,7 +365,7 @@ interface ScanControlsProps {
  * Start / Pause / Resume share one primary button so keyboard focus stays in
  * place as the scan changes state. Angles are captured automatically.
  */
-function ScanControls({ session, compact = false }: ScanControlsProps) {
+function ScanControls({ session, onReview, compact = false }: ScanControlsProps) {
   const { status } = session;
   const primary =
     status === 'ready'
@@ -361,7 +374,7 @@ function ScanControls({ session, compact = false }: ScanControlsProps) {
         ? { label: 'Pause scan', icon: Pause, onClick: session.pause, variant: 'secondary' as const }
         : status === 'paused'
           ? { label: 'Resume scan', icon: Play, onClick: session.resume, variant: 'primary' as const }
-          : { label: 'Restart scan', icon: RotateCcw, onClick: session.restart, variant: 'primary' as const };
+          : { label: 'Restart scan', icon: RotateCcw, onClick: session.restart, variant: 'secondary' as const };
   const PrimaryIcon = primary.icon;
 
   return (
@@ -379,7 +392,10 @@ function ScanControls({ session, compact = false }: ScanControlsProps) {
       )}
 
       {status === 'finished' && (
-        <p className="scan-page__next-note">Measurements are the next step and are not available yet.</p>
+        <Button size="lg" onClick={onReview}>
+          {compact ? 'Review' : 'Review measurements'}
+          <ArrowRight aria-hidden="true" size={20} />
+        </Button>
       )}
     </div>
   );
@@ -407,7 +423,7 @@ function PoseEngineNote({ pose }: { pose: PoseScanState }) {
       <span>
         <strong>{pose.status === 'ready' ? 'On-device pose detection active.' : 'Loading on-device pose detection…'}</strong>{' '}
         Your body position and angle are checked from detected joint positions, and each angle is captured only when the
-        pose is confirmed. Measurements are not estimated yet.
+        pose is confirmed. Measurements are calculated from the captured joint positions once all angles are done.
       </span>
     </p>
   );
