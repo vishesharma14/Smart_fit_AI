@@ -1,0 +1,13 @@
+anny-compact-v1.bin — a compact shape basis derived from the Anny body model.
+
+Anny, Copyright (C) 2025 NAVER Corporation. Licensed under the Apache License, Version 2.0
+(https://www.apache.org/licenses/LICENSE-2.0). Source: https://github.com/naver/anny
+(revision d6fc027ced5c17b6b0775dee944096ade7a9ef80).
+
+Anny relies on MakeHuman assets adapted from MPFB2 (https://github.com/makehumancommunity/mpfb2),
+licensed under CC0 1.0 Universal.
+
+This file was produced by SizerAI's tools/anny-export/export_anny_compact.py: it contains a
+principal-component approximation of Anny rest-pose meshes (not Anny's original data files),
+the mesh triangle list, vertex masks and landmark indices. The non-commercial SMPL-X topology
+distributed separately by NAVER is not used.

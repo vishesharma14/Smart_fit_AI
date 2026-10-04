@@ -1,0 +1,4 @@
+# Pinned inputs for export_anny_compact.py (export only; nothing here ships to the browser).
+anny @ git+https://github.com/naver/anny.git@d6fc027ced5c17b6b0775dee944096ade7a9ef80
+torch==2.14.1
+numpy

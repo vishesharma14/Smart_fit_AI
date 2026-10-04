@@ -37,7 +37,8 @@ current step explicitly asks for it.**
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
 4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
-8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan).
+8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
+9E-2 (Anny body-model shadow mode, developer view only).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -110,6 +111,16 @@ trust, view agreement, coverage and a model factor; depth only from the true sid
 elliptical cross-section (√((W cos θ)² + (D sin θ)²) vs measured width), raising or lowering confidence without
 changing values. **Outline measurements are capped at `uncertain` until validated
 against tape measurements of real people.** Tunables: `utils/silhouette/silhouetteConfig.ts`, `SILHOUETTE_MEASUREMENT`.
+Anny shadow mode (Step 9E-2, experimental, `?poseDebug` only): `tools/anny-export/` (pinned Anny revision
+d6fc027, run offline with PyTorch) writes `public/models/anny/anny-compact-v1.bin` (~2 MB: mean + 20 PCA components
+of rest-pose Anny bodies incl. 12 joints, triangles, arm/leg masks, waist loop, crotch vertex; NOTICE.txt =
+Apache-2.0 / CC0 attribution). `utils/anny/` (format loader, shape evaluation, exact triangle slicing + tape-like
+convex-hull circumferences, Gauss–Newton fitter, mesh measurements, `scanInput` = ScanCapture outline widths → fit
+input, `shadow` = reliability gate + comparison) runs in `workers/annyFit.worker.ts` via `hooks/useAnnyShadow`
+(only when `?poseDebug` and the scan is finished — normal scans never download the model). Unreliable fits
+(residual > 2 cm, height mismatch, out-of-range shape) are `unavailable`. All Anny measurement definitions need
+anthropometric validation; results are never used for the review page, final measurements, size prediction or
+saved data. The production ellipse engine is unchanged.
 **No size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
@@ -155,7 +166,7 @@ src/
                       user slice holds scanMeasurements (engine output) and measurements (confirmed)
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
                       useCamera, useFrameQuality, useScan360Session, usePoseScan, useVoiceGuidance,
-                      useMediaQuery, useScrollLock, useWakeLock)
+                      useMediaQuery, useScrollLock, useWakeLock, useAnnyShadow)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
                       frame analysis, pose/poseLandmarker = MediaPipe engine + mask reader, speech)
   utils/              pure helpers: constants, motion presets, unit conversion,
@@ -167,6 +178,9 @@ src/
   utils/silhouette/   body outline from the segmentation mask: extract (per frame), combine (median profile),
                       levels (chest/waist/hip/thigh rows, side depth, angled width), outlineQuality, config;
                       testBody = synthetic mask incl. angled views (tests only)
+  utils/anny/         Anny shadow model (Step 9E-2): format, model, slice, fit, measure, scanInput, shadow,
+                      workerProtocol; testModel (tests only)
+  workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),
                       review (edit/confirm rules), silhouetteMeasure (outline girths + inseam);
