@@ -46,6 +46,8 @@ const annyInfo = (ok: boolean): RecordedAnnyInfo => ({
   heightErrorCm: ok ? 0.2 : 2.4,
   iterations: 6,
   workerMs: 120,
+  modelLoadMs: 80,
+  fitMs: 40,
   viewsUsed: ['front', 'left', 'back', 'right'],
 });
 
@@ -53,6 +55,20 @@ export function syntheticAttempt(attempt: number, ellipse: Values, anny: Values 
   return {
     attempt,
     timestamp: `2026-01-01T00:0${attempt}:00.000Z`,
+    usable: true,
+    scanStatus: 'finished',
+    finishedEarly: false,
+    browser: `${SYNTHETIC_LABEL} browser`,
+    performance: {
+      scanDurationMs: 60000,
+      firstToLastViewMs: 40000,
+      meanDetectionsPerSecond: 20,
+      minDetectionsPerSecond: 15,
+      meanInferenceMs: 30,
+      scanCompletedNormally: 'yes',
+      cameraResponsive: 'yes',
+      browserSlowOrFroze: 'no',
+    },
     clothingType: 'activewear',
     clothingFit: 'fitted',
     deviceType: 'phone',
@@ -87,5 +103,18 @@ export const SYNTHETIC_ATTEMPT_3 = syntheticAttempt(
 );
 
 export function syntheticSubject(attempts: ValidationScanAttempt[] = [SYNTHETIC_ATTEMPT_1]): ValidationSubject {
-  return { subjectId: 'SYNTH-001', heightCm: 175, groundTruth: SYNTHETIC_GROUND_TRUTH, attempts, synthetic: true };
+  return {
+    subjectId: 'SYNTH-001',
+    heightCm: 175,
+    groundTruth: SYNTHETIC_GROUND_TRUTH,
+    sides: { thigh: 'right', 'arm-length': 'right' },
+    attempts,
+    synthetic: true,
+  };
+}
+
+/** SYNTHETIC unusable attempt (scan not finished): no values. */
+export function syntheticUnusableAttempt(attempt: number): ValidationScanAttempt {
+  const base = syntheticAttempt(attempt, {}, null);
+  return { ...base, usable: false, unusableReason: `${SYNTHETIC_LABEL}: scan not finished`, scanStatus: 'scanning' };
 }

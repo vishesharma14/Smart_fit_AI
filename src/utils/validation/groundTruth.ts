@@ -1,4 +1,4 @@
-import type { TapeMeasurement, ValidationMeasurementId } from '../../types/validation';
+import type { MeasuringSide, TapeMeasurement, ValidationMeasurementId, ValidationSubject } from '../../types/validation';
 import {
   MAX_NOTES_LENGTH,
   SUBJECT_ID_PATTERN,
@@ -13,21 +13,25 @@ import {
  */
 
 export type SubjectField = 'subjectId' | 'heightCm';
-export type GroundTruthErrors = Partial<Record<SubjectField | ValidationMeasurementId | `${ValidationMeasurementId}-notes`, string>>;
+export type SidedMeasurementId = keyof ValidationSubject['sides'];
+export type GroundTruthErrors = Partial<
+  Record<SubjectField | ValidationMeasurementId | `${ValidationMeasurementId}-notes` | `${SidedMeasurementId}-side`, string>
+>;
 
 export interface GroundTruthDraft {
   subjectId: string;
   heightCm: string;
   values: Partial<Record<ValidationMeasurementId, string>>;
   notes: Partial<Record<ValidationMeasurementId, string>>;
+  sides: ValidationSubject['sides'];
 }
 
 export type GroundTruthParse =
-  | { ok: true; subjectId: string; heightCm: number; groundTruth: TapeMeasurement[] }
+  | { ok: true; subjectId: string; heightCm: number; groundTruth: TapeMeasurement[]; sides: ValidationSubject['sides'] }
   | { ok: false; errors: GroundTruthErrors };
 
 export function emptyGroundTruthDraft(): GroundTruthDraft {
-  return { subjectId: '', heightCm: '', values: {}, notes: {} };
+  return { subjectId: '', heightCm: '', values: {}, notes: {}, sides: {} };
 }
 
 export function subjectIdError(subjectId: string): string | null {
@@ -73,6 +77,7 @@ export function parseGroundTruthDraft(draft: GroundTruthDraft): GroundTruthParse
   if (hError) errors.heightCm = hError;
 
   const groundTruth: TapeMeasurement[] = [];
+  const sides: ValidationSubject['sides'] = {};
   for (const def of VALIDATION_MEASUREMENTS) {
     const raw = draft.values[def.id]?.trim() ?? '';
     const notes = draft.notes[def.id]?.trim() ?? '';
@@ -84,13 +89,20 @@ export function parseGroundTruthDraft(draft: GroundTruthDraft): GroundTruthParse
       errors[def.id] = error ?? 'Enter a number.';
       continue;
     }
+    if (def.sided) {
+      const id = def.id as SidedMeasurementId;
+      const side: MeasuringSide | undefined = draft.sides[id];
+      if (side !== 'left' && side !== 'right') errors[`${id}-side`] = 'Record the side used.';
+      else sides[id] = side;
+    }
+    if (def.notesRequired && !notes) errors[`${def.id}-notes`] = 'Describe the measuring method in the notes.';
     groundTruth.push({ name: def.id, value, unit: 'cm', ...(notes ? { notes } : {}) });
   }
   if (!errors.heightCm && groundTruth.length === 0 && !VALIDATION_MEASUREMENTS.some((m) => errors[m.id]))
     errors[VALIDATION_MEASUREMENTS[0].id] = 'Enter at least one tape measurement.';
 
   if (Object.keys(errors).length > 0 || height === null) return { ok: false, errors };
-  return { ok: true, subjectId: draft.subjectId.trim(), heightCm: height, groundTruth };
+  return { ok: true, subjectId: draft.subjectId.trim(), heightCm: height, groundTruth, sides };
 }
 
 /** Checks already-structured ground truth (e.g. before use or export). Returns the problems found. */

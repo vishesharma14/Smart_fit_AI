@@ -414,10 +414,12 @@ export function BodyScanPage() {
           {debug && (
             <Suspense fallback={null}>
               <ValidationPanel
-                scanFinished={session.status === 'finished'}
+                scanStatus={session.status}
+                finishedEarly={session.finishedEarly}
                 captures={session.captures}
                 userHeightCm={userHeightCm}
                 annyShadow={annyShadow}
+                poseStats={pose.stats}
               />
             </Suspense>
           )}

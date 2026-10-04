@@ -1,5 +1,5 @@
 import type { MeasurementId, MeasurementStatus } from './measurement';
-import type { ScanViewId } from './scan';
+import type { ScanSessionStatus, ScanViewId } from './scan';
 
 /*
  * Real-person validation records (Step 9E-3A, developer view only).
@@ -24,6 +24,12 @@ export interface TapeMeasurement {
 }
 
 export type ClothingFit = 'fitted' | 'normal' | 'loose';
+
+/** Body side a one-sided tape measurement was taken on (keep it the same for repeated scans). */
+export type MeasuringSide = 'left' | 'right';
+
+/** Circumferences and lengths are always reported separately, never as one combined accuracy figure. */
+export type ValidationMeasurementGroup = 'circumference' | 'length';
 
 /** What the subject wore during the scan. */
 export type WornClothingType =
@@ -60,7 +66,30 @@ export interface RecordedAnnyInfo {
   iterations: number | null;
   /** Worker time: model load + fit (ms). */
   workerMs: number | null;
+  /** Model download + parse inside the worker (ms). */
+  modelLoadMs: number | null;
+  /** Fit alone (ms). */
+  fitMs: number | null;
   viewsUsed: ScanViewId[];
+}
+
+/** Tester's observation; `not-recorded` when not answered. */
+export type Observation = 'yes' | 'no' | 'not-recorded';
+
+/** Device performance during the scan (measured in the browser) plus the tester's observations. */
+export interface ScanPerformance {
+  /** Scan start (pressing start) → scan finished (ms), pauses included; null when not observed. */
+  scanDurationMs: number | null;
+  /** First view captured → last view captured (ms). */
+  firstToLastViewMs: number | null;
+  /** Pose-model runs per second while scanning: mean and lowest one-second sample. */
+  meanDetectionsPerSecond: number | null;
+  minDetectionsPerSecond: number | null;
+  /** Mean pose-model time per frame while scanning (ms). */
+  meanInferenceMs: number | null;
+  scanCompletedNormally: Observation;
+  cameraResponsive: Observation;
+  browserSlowOrFroze: Observation;
 }
 
 export interface ValidationScanAttempt {
@@ -68,11 +97,25 @@ export interface ValidationScanAttempt {
   attempt: number;
   /** ISO 8601 time the attempt was recorded. */
   timestamp: string;
+  /**
+   * False for an incomplete or invalid scan. Its measurements are not recorded (all unavailable) and it is left out
+   * of the error metrics and repeatability; it only counts as an unusable attempt.
+   */
+  usable: boolean;
+  unusableReason?: string;
+  /** Scan session state when recorded. */
+  scanStatus: ScanSessionStatus;
+  finishedEarly: boolean;
   clothingType: WornClothingType;
   clothingFit: ClothingFit;
   deviceType: ValidationDeviceType;
   cameraType: ValidationCameraType;
   lighting: LightingCondition;
+  /** Browser and platform, detected (e.g. "Chrome 129 · Android"). */
+  browser: string;
+  /** Device model / browser details typed by the tester (optional). */
+  deviceDetails?: string;
+  performance: ScanPerformance;
   /** Height entered in the app for this scan (cm), which scales both engines. */
   enteredHeightCm: number | null;
   /** Views captured in the scan. */
@@ -90,7 +133,10 @@ export interface ValidationSubject {
   subjectId: string;
   /** Tape-measured height (cm). */
   heightCm: number;
+  /** Fixed once the first scan is recorded, so repeated scans share the same ground truth. */
   groundTruth: TapeMeasurement[];
+  /** Side used for the thigh and arm measurements. */
+  sides: Partial<Record<'thigh' | 'arm-length', MeasuringSide>>;
   attempts: ValidationScanAttempt[];
   /** True only for test fixtures. Synthetic data never represents real-person accuracy. */
   synthetic: boolean;
