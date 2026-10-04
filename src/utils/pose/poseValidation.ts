@@ -1,5 +1,4 @@
 import type { PoseFrame, PoseLandmark } from '../../types/pose';
-import type { ScanPhaseId } from '../../types/scan';
 import type { SilhouetteFrame } from '../../types/silhouette';
 import { POSE_SCAN_CONFIG, type PoseScanConfig } from './poseConfig';
 import { LM, mid, toPixels, type Point, type VisibleRegion } from './landmarks';
@@ -7,9 +6,10 @@ import { estimateOrientation, type CoarseView, type OrientationCalibration, type
 import { SCAN_REGIONS, type BodyPart, type ScanRegionDefinition } from './scanRegions';
 
 /*
- * Per-frame pose validation for one scan angle and body region. Checks run in
- * a fixed order and the first failure is reported, so the user always gets
- * the single most useful instruction. Every check reads real landmarks from
+ * Per-frame pose validation for the body region, at whatever angle the user
+ * is turned (the 360° scan decides which view a frame belongs to from the
+ * orientation estimate). Checks run in a fixed order and the first failure is
+ * reported, so the user always gets the single most useful instruction. Every check reads real landmarks from
  * the pose model; nothing here estimates body measurements. The region
  * (full, upper or lower body — see scanRegions) decides which landmarks,
  * bounds and posture checks apply.
@@ -31,7 +31,6 @@ export type PoseIssue =
   /** `step`: which way the user should step, from their own point of view, when it can be told (front / back). */
   | { kind: 'off-centre'; step: 'left' | 'right' | null }
   | { kind: 'body-hidden'; part: BodyPart }
-  | { kind: 'wrong-orientation'; detected: ScanPhaseId | null }
   | { kind: 'not-upright' }
   | { kind: 'arms-down' }
   | { kind: 'arms-raised' }
@@ -54,7 +53,7 @@ export interface PoseMetrics {
 }
 
 export interface PoseAssessment {
-  /** First failed check, or null when the pose is valid for the requested angle. */
+  /** First failed check, or null when the pose is valid. */
   issue: PoseIssue | null;
   /** Number of people the model found. */
   people: number;
@@ -70,7 +69,6 @@ export interface PoseAssessment {
 export interface AssessPoseInput {
   frame: PoseFrame;
   region: VisibleRegion;
-  target: ScanPhaseId;
   calibration: OrientationCalibration | null;
   previousView: CoarseView | null;
   /** Body region being scanned (defaults to the full body). */
@@ -153,7 +151,6 @@ function primaryIndex(frame: PoseFrame): number {
 export function assessPose({
   frame,
   region,
-  target,
   calibration,
   previousView,
   scanRegion = SCAN_REGIONS.full,
@@ -286,12 +283,13 @@ export function assessPose({
   // 5. The region's key joints clearly visible (not hidden by clothing, furniture or poor light).
   //    Side-on, the far side of the body is naturally hidden, so one of each pair is enough.
   const frontal = orientation.view === 'frontal';
+  // Facing away from the camera (back and back-angled views), where the face is hidden by design.
+  const facingAway = orientation.orientation === 'back' || orientation.frontness <= -0.25;
   for (const part of scanRegion.requiredParts) {
     if (part === 'head') {
-      // From behind the face is hidden by design, so the head is only checked for the other angles.
-      if (target === 'back') continue;
+      if (facingAway) continue;
       const headSeen =
-        frontal && target === 'front' ? seen(LM.nose) : seen(LM.nose) || seen(LM.leftEar) || seen(LM.rightEar);
+        orientation.orientation === 'front' ? seen(LM.nose) : seen(LM.nose) || seen(LM.leftEar) || seen(LM.rightEar);
       if (!headSeen) return fail({ kind: 'body-hidden', part });
       continue;
     }
@@ -301,15 +299,12 @@ export function assessPose({
     if (!(frontal ? leftSeen && rightSeen : leftSeen || rightSeen)) return fail({ kind: 'body-hidden', part });
   }
 
-  // 6. Facing the requested direction.
-  if (orientation.orientation !== target) return fail({ kind: 'wrong-orientation', detected: orientation.orientation });
-
-  // 7. Standing upright.
+  // 6. Standing upright.
   if (tiltDeg > config.maxTorsoTiltDeg) return fail({ kind: 'not-upright' });
 
-  // 8. Front and back: arms slightly away from the body and feet apart, where they are in the region, so the
-  //    torso and legs are separable.
-  if (target === 'front' || target === 'back') {
+  // 7. Facing toward or away from the camera: arms slightly away from the body and feet apart, where they are in the
+  //    region, so the torso and legs are separable in the outline.
+  if (orientation.orientation === 'front' || orientation.orientation === 'back') {
     if (scanRegion.checkArms) {
       if (Math.min(...armAnglesDeg) < config.minArmAngleDeg) return fail({ kind: 'arms-down' });
       if (Math.max(...armAnglesDeg) > config.maxArmAngleDeg) return fail({ kind: 'arms-raised' });
@@ -393,7 +388,8 @@ export function buildCaptureFromHold(
   hold: HoldState,
   samples: ValidatedSample[],
   now: number,
-  config: PoseScanConfig = POSE_SCAN_CONFIG,
+  config: { captureMinFrames: number; captureHoldMs: number } = POSE_SCAN_CONFIG,
+  aggregate: (frames: PoseLandmark[][]) => PoseLandmark[] = averageLandmarks,
 ): { landmarks: PoseLandmark[]; worldLandmarks: PoseLandmark[]; sampleCount: number; holdMs: number } | null {
   if (hold.since === null || samples.length === 0) return null;
   const holdMs = now - hold.since;
@@ -401,8 +397,8 @@ export function buildCaptureFromHold(
   if (samples.length < config.captureMinFrames || holdMs < config.captureHoldMs) return null;
   if (samples[0].time !== hold.since) return null;
   return {
-    landmarks: averageLandmarks(samples.map((sample) => sample.landmarks)),
-    worldLandmarks: averageLandmarks(samples.map((sample) => sample.worldLandmarks)),
+    landmarks: aggregate(samples.map((sample) => sample.landmarks)),
+    worldLandmarks: aggregate(samples.map((sample) => sample.worldLandmarks)),
     sampleCount: samples.length,
     holdMs,
   };
@@ -421,4 +417,19 @@ export function averageLandmarks(frames: PoseLandmark[][]): PoseLandmark[] {
     }
     return { x: sum.x / count, y: sum.y / count, z: sum.z / count, visibility: sum.visibility / count };
   });
+}
+
+/** Per-landmark median of the hold's frames: robust to a single jumpy frame (used by the 360° scan). */
+export function medianLandmarks(frames: PoseLandmark[][]): PoseLandmark[] {
+  const med = (values: number[]) => {
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = sorted.length >> 1;
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+  return frames[0].map((_, index) => ({
+    x: med(frames.map((frame) => frame[index].x)),
+    y: med(frames.map((frame) => frame[index].y)),
+    z: med(frames.map((frame) => frame[index].z)),
+    visibility: med(frames.map((frame) => frame[index].visibility)),
+  }));
 }

@@ -7,14 +7,15 @@ import type { SilhouetteProfile } from './silhouette';
  * and the outline numbers derived from its segmentation mask.
  */
 
+/** The four cardinal views: facing the camera, turned left (side-on), back, turned right (side-on). */
 export type ScanPhaseId = 'front' | 'left' | 'back' | 'right';
 
 /**
- * - `pending`: not reached yet
- * - `active`: the angle currently being guided
- * - `captured`: the pose model confirmed this angle and a landmark snapshot was taken
+ * Views of the guided 360° scan, by body angle (0° facing the camera, turning to the user's left):
+ * front 0° · front-left 45° · left 90° · back-left 135° · back 180° · back-right 225° · right 270° · front-right 315°.
+ * The angles are targets: a capture is accepted anywhere within its view's window and keeps its own measured angle.
  */
-export type ScanPhaseStatus = 'pending' | 'active' | 'captured';
+export type ScanViewId = ScanPhaseId | 'front-left' | 'back-left' | 'back-right' | 'front-right';
 
 /**
  * What is kept when an angle is captured: pose landmarks averaged over the
@@ -22,8 +23,10 @@ export type ScanPhaseStatus = 'pending' | 'active' | 'captured';
  * Kept in memory only.
  */
 export interface ScanCapture {
-  /** Angle this capture was validated for (always the angle that was active at the time). */
-  phase: ScanPhaseId;
+  /** View this capture was accepted for. */
+  phase: ScanViewId;
+  /** Body angle estimated from the pose during the capture (median over its frames, degrees 0–360); absent on older captures. */
+  yawDeg?: number;
   capturedAt: number;
   /** Number of consecutive validated frames averaged into this capture. */
   sampleCount: number;

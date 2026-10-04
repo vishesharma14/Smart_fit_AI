@@ -1,5 +1,5 @@
 import type { PoseLandmark } from '../../types/pose';
-import type { ScanPhaseId } from '../../types/scan';
+import type { ScanViewId } from '../../types/scan';
 import { LM } from '../pose/landmarks';
 import type { MaskView } from './extract';
 
@@ -10,6 +10,8 @@ import type { MaskView } from './extract';
  *
  * Front (and back) widths: chest 32 · waist 27 · hips 35 · one thigh 17.
  * Side depths:              chest 24 · waist 20 · hips 26 · thigh 18.
+ * Angled views (45° etc.): each torso cross-section is an ellipse of that width and depth, so it shows
+ * √((W·cos θ)² + (D·sin θ)²); the legs are drawn side-on (they overlap).
  * Stature 175 · crotch 80 cm above the floor.
  * Mask edges are linear ramps, so the 0.5 crossing is exactly the shape's edge.
  */
@@ -36,7 +38,21 @@ export interface BodyOptions {
   armsTouching?: boolean;
   /** Legs together: no gap between them. */
   legsTogether?: boolean;
+  /** Angled views only: multiplies the rendered torso width (an outline that doesn't match the elliptical model). */
+  angledScale?: number;
 }
+
+/** Body angle of each view (degrees, turning to the user's left). */
+const VIEW_YAW: Record<ScanViewId, number> = {
+  front: 0,
+  'front-left': 45,
+  left: 90,
+  'back-left': 135,
+  back: 180,
+  'back-right': 225,
+  right: 270,
+  'front-right': 315,
+};
 
 interface Shape {
   /** Vertical extent (cm above the floor). */
@@ -62,16 +78,32 @@ const profile = (points: [number, number][]) => (h: number) => {
 
 const centred = (half: (h: number) => number) => (h: number): [number, number] => [-half(h), half(h)];
 
+const FRONT_TORSO_HALF = profile([
+  [80, 17.5],
+  [96, 17.5],
+  [100, 13.5],
+  [112, 13.5],
+  [118, 16],
+  [146, 16],
+]);
+const SIDE_TORSO_HALF = profile([
+  [78, 13],
+  [98, 13],
+  [100, 10],
+  [114, 10],
+  [116, 12],
+  [146, 12],
+]);
+const SIDE_LEG_HALF = profile([
+  [8, 4],
+  [48, 5.5],
+  [66, 9],
+  [90, 9],
+]);
+
 function frontShapes(options: BodyOptions): Shape[] {
   const t = options.torsoScale ?? 1;
-  const torsoHalf = profile([
-    [80, 17.5],
-    [96, 17.5],
-    [100, 13.5],
-    [112, 13.5],
-    [118, 16],
-    [146, 16],
-  ]);
+  const torsoHalf = FRONT_TORSO_HALF;
   const legCentre = options.legsTogether ? 8.5 : 9;
   const legHalf = profile([
     [8, 3.5],
@@ -120,20 +152,8 @@ function armShapes(side: number, touching: boolean): Shape[] {
 
 function sideShapes(options: BodyOptions): Shape[] {
   const t = options.torsoScale ?? 1;
-  const torsoHalf = profile([
-    [78, 13],
-    [98, 13],
-    [100, 10],
-    [114, 10],
-    [116, 12],
-    [146, 12],
-  ]);
-  const legHalf = profile([
-    [8, 4],
-    [48, 5.5],
-    [66, 9],
-    [90, 9],
-  ]);
+  const torsoHalf = SIDE_TORSO_HALF;
+  const legHalf = SIDE_LEG_HALF;
   return [
     { from: 157, to: 175, rampTop: true, span: centred(() => 9) },
     { from: 146, to: 157, span: centred(() => 6) },
@@ -144,16 +164,31 @@ function sideShapes(options: BodyOptions): Shape[] {
   ];
 }
 
-const isSide = (phase: ScanPhaseId) => phase === 'left' || phase === 'right';
+function angledShapes(yawDeg: number, options: BodyOptions): Shape[] {
+  const t = (options.torsoScale ?? 1) * (options.angledScale ?? 1);
+  const c = Math.abs(Math.cos((yawDeg * Math.PI) / 180));
+  const sn = Math.abs(Math.sin((yawDeg * Math.PI) / 180));
+  const half = (h: number) => Math.hypot(FRONT_TORSO_HALF(h) * c, SIDE_TORSO_HALF(h) * sn) * t;
+  return [
+    { from: 157, to: 175, rampTop: true, span: centred(() => 8.5) },
+    { from: 146, to: 157, span: centred(() => 6) },
+    { from: 80, to: 146, rampBottom: true, span: centred(half) },
+    { from: 8, to: 90, span: centred(SIDE_LEG_HALF) },
+    { from: 0, to: 8, rampBottom: true, span: () => [-8, 8] },
+  ];
+}
 
-export function renderBodyMask(phase: ScanPhaseId, options: BodyOptions = {}): MaskView {
+const isSide = (phase: ScanViewId) => phase === 'left' || phase === 'right';
+const isAngled = (phase: ScanViewId) => VIEW_YAW[phase] % 90 !== 0;
+
+export function renderBodyMask(phase: ScanViewId, options: BodyOptions = {}): MaskView {
   const W = options.width ?? 480;
   const H = options.height ?? 720;
   const s = options.pxPerCm ?? 600 / BODY.statureCm;
   const floorY = options.floorY ?? 660;
   const soft = options.softPx ?? 1.5;
   const cx = W / 2;
-  const shapes = isSide(phase) ? sideShapes(options) : frontShapes(options);
+  const shapes = isAngled(phase) ? angledShapes(VIEW_YAW[phase], options) : isSide(phase) ? sideShapes(options) : frontShapes(options);
   const data = new Float32Array(W * H);
   for (let y = 0; y < H; y += 1) {
     const h = (floorY - y) / s;
@@ -181,13 +216,15 @@ export function renderBodyMask(phase: ScanPhaseId, options: BodyOptions = {}): M
 }
 
 /** Image landmarks (0–1) matching the rendered body, plus visibility. */
-export function bodyLandmarks(phase: ScanPhaseId, options: BodyOptions = {}): PoseLandmark[] {
+export function bodyLandmarks(phase: ScanViewId, options: BodyOptions = {}): PoseLandmark[] {
   const W = options.width ?? 480;
   const H = options.height ?? 720;
   const s = options.pxPerCm ?? 600 / BODY.statureCm;
   const floorY = options.floorY ?? 660;
   const cx = W / 2;
   const side = isSide(phase);
+  // Angled views: the front layout foreshortened by |cos θ| (arms stay held away, clear of the torso).
+  const squeeze = isAngled(phase) ? Math.abs(Math.cos((VIEW_YAW[phase] * Math.PI) / 180)) : 1;
   const tan = options.armsTouching ? 0 : Math.tan(Math.PI / 6);
   const start = options.armsTouching ? 20 : 19;
   const legX = options.legsTogether ? 8.5 : 9;
@@ -237,6 +274,6 @@ export function bodyLandmarks(phase: ScanPhaseId, options: BodyOptions = {}): Po
       };
   return Array.from({ length: 33 }, (_, i) => {
     const [x, h] = joints[i] ?? [0, 160];
-    return { x: (cx + x * s) / W, y: (floorY - h * s) / H, z: 0, visibility: 0.95 };
+    return { x: (cx + x * squeeze * s) / W, y: (floorY - h * s) / H, z: 0, visibility: 0.95 };
   });
 }

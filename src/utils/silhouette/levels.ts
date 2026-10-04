@@ -211,3 +211,28 @@ export function depthAt(frame: SilhouetteFrame, heightFraction: number, config =
 export function handAtRow(landmarks: PoseLandmark[], frame: SilhouetteFrame, y: number, config = SILHOUETTE_CONFIG): boolean {
   return armLines(landmarks, frame.width, frame.height, config).some((arm) => polylineXAt(arm.slice(2), y) !== null);
 }
+
+/**
+ * Width of the body at a height (fraction of stature) in an angled view: like `depthAt`, but only rows where the
+ * arms and hands are clear of the torso count, since an arm in front of or beside the torso would widen it.
+ */
+export function projectedWidthAt(
+  frame: SilhouetteFrame,
+  landmarks: PoseLandmark[],
+  heightFraction: number,
+  config = SILHOUETTE_CONFIG,
+): Level | null {
+  const { headTopY, floorY } = frame;
+  if (headTopY === null || floorY === null || !(floorY > headTopY) || !Number.isFinite(heightFraction)) return null;
+  const stature = floorY - headTopY;
+  const y = floorY - heightFraction * stature;
+  const half = Math.max(1, Math.round(config.depthBandHalf * stature));
+  const rows = bandRows(frame, y - half, y + half);
+  const arms = armLines(landmarks, frame.width, frame.height, config);
+  const runs = rows.flatMap((r) => {
+    const row = frame.rows[r];
+    return row?.center && armsClear(row.center, r, arms) ? [{ w: width(row.center), sharpness: row.sharpness }] : [];
+  });
+  if (rows.length === 0 || runs.length * 2 <= rows.length) return null;
+  return { y, heightFraction, sizePx: median(runs.map((r) => r.w)), sharpness: median(runs.map((r) => r.sharpness)) };
+}

@@ -50,7 +50,8 @@ export function MeasurementReviewPage() {
         <p className="measure-review__disclaimer">
           <Info aria-hidden="true" size={18} strokeWidth={1.75} />
           <span>
-            These are estimates from a camera scan, not tailor or medical measurements. Each one shows how confident the
+            Camera-based measurements are estimates. For best results, wear fitted clothing, keep your full body
+            visible, and follow the scan guidance. These are not tailor or medical measurements. Each one shows how confident the
             scan is, and measurements the scan can’t provide are marked unavailable rather than guessed. Circumferences and
             inseam come from your body outline and stay marked uncertain until they have been checked against tape
             measurements.
@@ -73,7 +74,7 @@ function NoResults() {
     <FlowStepForm titleId={TITLE_ID} onSubmit={(event) => event.preventDefault()}>
       <FormCard titleId="measurements-empty" title="No scan results yet">
         <p className="measure-review__empty">
-          Complete all four angles of the body scan first. Your measurements are calculated from that scan.
+          Complete the guided 360° body scan first. Your measurements are calculated from that scan.
         </p>
         <Button to={PATHS.scan} size="lg">
           <ScanLine aria-hidden="true" size={20} />

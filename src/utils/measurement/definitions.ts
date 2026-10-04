@@ -1,5 +1,5 @@
 import type { MeasurementId } from '../../types/measurement';
-import type { ScanCapture, ScanPhaseId } from '../../types/scan';
+import type { ScanCapture, ScanViewId } from '../../types/scan';
 import { LM } from '../pose/landmarks';
 import type { ScanRegionId } from '../pose/scanRegions';
 import type { LevelId } from '../silhouette/levels';
@@ -30,7 +30,7 @@ interface BaseDefinition {
 export interface LandmarkDefinition extends BaseDefinition {
   kind: 'landmark';
   /** Angles whose captures may contribute (others would foreshorten or hide the landmarks). */
-  angles: ScanPhaseId[];
+  angles: ScanViewId[];
   landmarks: string[];
   /** Samples from one capture (e.g. one per visible arm); empty when the landmarks aren't clearly visible. */
   sample: (capture: ScanCapture) => AngleSample[];

@@ -1,8 +1,11 @@
 import type { UseCamera } from '../../hooks/useCamera';
 import type { PoseScanState } from '../../hooks/usePoseScan';
 import { POSE_MODEL_NAME } from '../../services/pose/poseLandmarker';
-import type { ScanCapture, ScanPhaseId } from '../../types/scan';
+import { useAppStore } from '../../store/useAppStore';
+import type { ScanCapture, ScanViewId } from '../../types/scan';
+import { silhouetteScale } from '../../utils/measurement/calibration';
 import type { ScanRegionDefinition } from '../../utils/pose/scanRegions';
+import type { Coverage } from '../../utils/scan360/session';
 import './PoseDebugPanel.css';
 
 const fixed = (value: number | null | undefined, digits = 2) =>
@@ -13,10 +16,13 @@ interface PoseDebugPanelProps {
   pose: PoseScanState;
   camera: UseCamera;
   scanRegion: ScanRegionDefinition;
-  captures: Partial<Record<ScanPhaseId, ScanCapture>>;
+  captures: Partial<Record<ScanViewId, ScanCapture>>;
+  coverage: Coverage;
 }
 
-export function PoseDebugPanel({ pose, camera, scanRegion, captures }: PoseDebugPanelProps) {
+export function PoseDebugPanel({ pose, camera, scanRegion, captures, coverage }: PoseDebugPanelProps) {
+  const userHeightCm = useAppStore((s) => s.userInfo.heightCm);
+  const { decision, yaw, outline, frameCounts } = pose;
   const { assessment, stats, silhouette } = pose;
   const orientation = assessment?.orientation;
   const metrics = assessment?.metrics;
@@ -59,7 +65,33 @@ export function PoseDebugPanel({ pose, camera, scanRegion, captures }: PoseDebug
     ['Arms', metrics ? `${fixed(metrics.armAnglesDeg[0], 0)}° / ${fixed(metrics.armAnglesDeg[1], 0)}°` : '–'],
     ['Stance', fixed(metrics?.stanceRatio)],
     ['Jitter', `${fixed(pose.jitter, 3)}${pose.moving ? ' (moving)' : ''}`],
-    ['Hold', fixed(pose.holdProgress)],
+    ['Body angle', yaw ? `${fixed(yaw.yawDeg, 0)}° (confidence ${fixed(yaw.confidence)})` : '–'],
+    [
+      'Frame',
+      decision ? `${decision.accept ? 'accepted' : `rejected: ${decision.reason}`} · window ${decision.view ?? 'between views'}` : '–',
+    ],
+    [
+      'Frames',
+      `accepted ${frameCounts.accepted} · ${
+        Object.entries(frameCounts)
+          .filter(([key]) => key !== 'accepted')
+          .map(([key, n]) => `${key} ${n}`)
+          .join(' · ') || 'no rejections'
+      }`,
+    ],
+    [
+      'Outline quality',
+      outline
+        ? `${outline.issue ?? 'ok'} · sharpness ${fixed(outline.sharpness)} · vs joints ${fixed(outline.disagreement)}`
+        : 'not read',
+    ],
+    ['Hold', `${pose.holdView ?? '–'} · ${fixed(pose.holdProgress)}${pose.lastHoldFailure ? ` · last discarded: ${pose.lastHoldFailure}` : ''}`],
+    [
+      'Coverage',
+      `${coverage.captured.join(', ') || 'none'} · missing cardinal: ${coverage.missingCardinal.join(', ') || 'none'} · ${
+        coverage.complete ? 'complete' : coverage.canFinishEarly ? 'can finish early' : 'insufficient'
+      }`,
+    ],
     [
       'Outline',
       silhouette
@@ -73,7 +105,7 @@ export function PoseDebugPanel({ pose, camera, scanRegion, captures }: PoseDebug
     [
       'Saved captures',
       Object.values(captures)
-        .map((c) => `${c.phase}: ${c.sampleCount} frames / ${Math.round(c.holdMs)} ms`)
+        .map((c) => `${c.phase} @ ${fixed(c.yawDeg, 0)}°: ${c.sampleCount} frames / ${Math.round(c.holdMs)} ms`)
         .join(' · ') || 'none',
     ],
     [
@@ -89,6 +121,17 @@ export function PoseDebugPanel({ pose, camera, scanRegion, captures }: PoseDebug
             : `${c.phase}: none`,
         )
         .join(' · ') || 'none',
+    ],
+    [
+      'Calibration',
+      `front width ratio ${fixed(captures.front?.widthRatio)} · outline scale: ${
+        Object.values(captures)
+          .map((c) => {
+            const scale = silhouetteScale(c, userHeightCm);
+            return `${c.phase} ${scale ? `${fixed(scale.cmPerPx, 3)} cm/px (${fixed(scale.confidence)})` : 'rejected'}`;
+          })
+          .join(' · ') || '–'
+      }`,
     ],
   ];
   return (

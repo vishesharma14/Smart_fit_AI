@@ -1,5 +1,5 @@
 import type { PoseLandmark } from '../../types/pose';
-import type { ScanCapture, ScanPhaseId } from '../../types/scan';
+import type { ScanCapture, ScanViewId } from '../../types/scan';
 import { LM } from '../pose/landmarks';
 import { combineSilhouetteFrames } from '../silhouette/combine';
 import { extractSilhouetteFrame } from '../silhouette/extract';
@@ -61,10 +61,19 @@ export function withVisibility(landmarks: PoseLandmark[], indices: number[], vis
   return landmarks.map((p, i) => (indices.includes(i) ? { ...p, visibility } : p));
 }
 
-const PHASE_ROTATION: Record<ScanPhaseId, number> = { front: 0, left: 90, back: 180, right: 270 };
+const PHASE_ROTATION: Record<ScanViewId, number> = {
+  front: 0,
+  'front-left': 45,
+  left: 90,
+  'back-left': 135,
+  back: 180,
+  'back-right': 225,
+  right: 270,
+  'front-right': 315,
+};
 
 export function makeCapture(
-  phase: ScanPhaseId,
+  phase: ScanViewId,
   overrides: Partial<ScanCapture> & { scale?: number; visibility?: number } = {},
 ): ScanCapture {
   const { scale = 1, visibility = 0.95, ...rest } = overrides;
@@ -87,9 +96,9 @@ export function makeCapture(
 }
 
 export function makeCaptures(
-  phases: ScanPhaseId[] = ['front', 'left', 'back', 'right'],
+  phases: ScanViewId[] = ['front', 'left', 'back', 'right'],
   overrides: Parameters<typeof makeCapture>[1] = {},
-): Partial<Record<ScanPhaseId, ScanCapture>> {
+): Partial<Record<ScanViewId, ScanCapture>> {
   return Object.fromEntries(phases.map((phase) => [phase, makeCapture(phase, overrides)]));
 }
 
@@ -100,7 +109,7 @@ export function makeCaptures(
  * `frames` renders one mask per entry (default: three identical frames).
  */
 export function makeSilhouetteCapture(
-  phase: ScanPhaseId,
+  phase: ScanViewId,
   body: BodyOptions = {},
   frames: BodyOptions[] = [body, body, body],
 ): ScanCapture {
@@ -110,13 +119,14 @@ export function makeSilhouetteCapture(
   return {
     ...makeCapture(phase),
     landmarks: bodyLandmarks(phase, body),
+    yawDeg: PHASE_ROTATION[phase],
     ...(outline ? { silhouette: outline } : {}),
   };
 }
 
 export function makeSilhouetteCaptures(
-  phases: ScanPhaseId[] = ['front', 'left', 'back', 'right'],
+  phases: ScanViewId[] = ['front', 'left', 'back', 'right'],
   body: BodyOptions = {},
-): Partial<Record<ScanPhaseId, ScanCapture>> {
+): Partial<Record<ScanViewId, ScanCapture>> {
   return Object.fromEntries(phases.map((phase) => [phase, makeSilhouetteCapture(phase, body)]));
 }

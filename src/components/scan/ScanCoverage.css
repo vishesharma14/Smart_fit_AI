@@ -1,0 +1,113 @@
+.scan-coverage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.scan-coverage__ring {
+  flex: none;
+  width: 7.5rem;
+  height: 7.5rem;
+}
+
+.scan-coverage__segment {
+  fill: none;
+  stroke: rgb(148 163 214 / 0.22);
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke var(--transition-base);
+}
+
+.scan-coverage__segment--diagonal {
+  stroke-width: 6;
+}
+
+.scan-coverage__segment--holding {
+  stroke: var(--color-secondary);
+}
+
+.scan-coverage__segment--captured {
+  stroke: var(--color-success);
+}
+
+.scan-coverage__marker {
+  fill: var(--color-text);
+  stroke: var(--color-bg);
+  stroke-width: 2;
+}
+
+.scan-coverage__count {
+  fill: var(--color-text);
+  font-size: 22px;
+  font-weight: 700;
+  text-anchor: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.scan-coverage__caption {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-anchor: middle;
+  text-transform: uppercase;
+}
+
+.scan-coverage__info {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.scan-coverage__summary {
+  font-weight: 600;
+}
+
+.scan-coverage__angle {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.scan-coverage__quality {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.scan-coverage__quality-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-text-subtle);
+}
+
+.scan-coverage__quality--good .scan-coverage__quality-dot {
+  background: var(--color-success);
+}
+
+.scan-coverage__quality--fair .scan-coverage__quality-dot {
+  background: var(--color-warning);
+}
+
+.scan-coverage__quality--poor .scan-coverage__quality-dot {
+  background: var(--color-danger);
+}
+
+/* Full-screen phone scan: small ring beside one-line readouts */
+.scan-coverage--compact {
+  gap: var(--space-3);
+}
+
+.scan-coverage--compact .scan-coverage__ring {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.scan-coverage--compact .scan-coverage__caption {
+  display: none;
+}
+
+.scan-coverage--compact .scan-coverage__info {
+  font-size: var(--text-xs);
+}

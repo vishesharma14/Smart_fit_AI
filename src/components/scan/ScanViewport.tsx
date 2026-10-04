@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, CameraOff, LoaderCircle } from 'lucide-react';
 import type { UseCamera } from '../../hooks/useCamera';
-import type { ScanPhaseId } from '../../types/scan';
 import { CAMERA_ERROR_COPY } from '../../utils/scanGuidance';
 import { Button } from '../Button';
 import type { ScanGuidance } from '../../utils/scanGuidance';
@@ -12,10 +11,10 @@ import './ScanViewport.css';
 
 interface ScanViewportProps {
   camera: UseCamera;
-  /** Angle label shown on the preview while scanning, e.g. "Front". */
+  /** Label shown on the preview while scanning, e.g. the view being captured. */
   phaseLabel: string | null;
-  /** Scan angle the reference mannequin demonstrates. */
-  guidePhase: ScanPhaseId;
+  /** Body angle (degrees) the reference mannequin demonstrates. */
+  guideYawDeg: number;
   /** Part of the reference figure to show for the scanned body region. */
   guideRange?: [number, number];
   /** Optional layer drawn over the live preview (e.g. the pose debug skeleton). */
@@ -25,7 +24,7 @@ interface ScanViewportProps {
 }
 
 /** Large camera preview with the body guide overlay, plus the camera-off / loading / error states. */
-export function ScanViewport({ camera, phaseLabel, guidePhase, guideRange, overlay, instruction }: ScanViewportProps) {
+export function ScanViewport({ camera, phaseLabel, guideYawDeg, guideRange, overlay, instruction }: ScanViewportProps) {
   const { status, error, facingMode, videoRef, start } = camera;
   const active = status === 'active';
   const canRetry = error !== 'unsupported' && error !== 'insecure-context';
@@ -44,7 +43,7 @@ export function ScanViewport({ camera, phaseLabel, guidePhase, guideRange, overl
         hidden={!active}
       />
 
-      {active && <BodyGuideOverlay phase={guidePhase} mirrored={mirrored} range={guideRange} />}
+      {active && <BodyGuideOverlay yawDeg={guideYawDeg} mirrored={mirrored} range={guideRange} />}
       {active && overlay}
       {active && instruction && <ScanInstruction guidance={instruction} />}
 
