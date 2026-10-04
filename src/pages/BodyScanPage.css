@@ -203,12 +203,6 @@
   gap: var(--space-3);
 }
 
-.scan-page__next-note {
-  font-size: var(--text-sm);
-  text-align: center;
-  color: var(--color-text-muted);
-}
-
 /* Privacy */
 .scan-page__privacy {
   grid-area: privacy;
@@ -249,10 +243,6 @@
 
   .scan-page__controls .button {
     flex: 1 1 auto;
-  }
-
-  .scan-page__next-note {
-    flex-basis: 100%;
   }
 }
 
@@ -385,8 +375,7 @@
   padding: 0 var(--space-3);
 }
 
-.scan-page__stage--immersive .scan-page__controls > :only-child,
-.scan-page__stage--immersive .scan-page__next-note {
+.scan-page__stage--immersive .scan-page__controls > :only-child {
   grid-column: 1 / -1;
 }
 

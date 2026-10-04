@@ -3,6 +3,7 @@ import { RootLayout } from '../layouts/RootLayout';
 import { BodyScanPage } from '../pages/BodyScanPage';
 import { ClothingSelectionPage } from '../pages/ClothingSelectionPage';
 import { HomePage } from '../pages/HomePage';
+import { MeasurementReviewPage } from '../pages/MeasurementReviewPage';
 import { UserInfoPage } from '../pages/UserInfoPage';
 import { PATHS } from './paths';
 
@@ -15,6 +16,7 @@ export const router = createBrowserRouter([
       { path: PATHS.userInfo, element: <UserInfoPage /> },
       { path: PATHS.clothing, element: <ClothingSelectionPage /> },
       { path: PATHS.scan, element: <BodyScanPage /> },
+      { path: PATHS.measurements, element: <MeasurementReviewPage /> },
     ],
   },
 ]);

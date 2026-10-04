@@ -1,3 +1,4 @@
+import type { ClothingType } from './domain';
 import type { ScanPhaseId } from './scan';
 
 /*
@@ -84,4 +85,37 @@ export interface MeasurementReport {
   anglesUsed: ScanPhaseId[];
   /** Captures that were ignored and why (e.g. wrong region or malformed data). */
   warnings: string[];
+}
+
+/**
+ * A measurement on the review screen: the engine's `Measurement` (status and
+ * confidence unchanged) plus whether the user replaced its value by hand.
+ */
+export interface ReviewedMeasurement extends Measurement {
+  /** The engine's value before any edit (null when the engine gave none). */
+  measuredValue: number | null;
+  /** True when `value` is the user's own entry rather than the engine's. */
+  manuallyEdited: boolean;
+}
+
+/** A completed scan's engine output, waiting for review. */
+export interface ScanMeasurementResult {
+  report: MeasurementReport;
+  /** Garment the scan was made for (decides the region); null when none was selected. */
+  clothingType: ClothingType | null;
+  /** ISO 8601 time the measurements were computed. */
+  measuredAt: string;
+}
+
+/** The measurements the user reviewed and confirmed (input for size prediction in a later step). */
+export interface ConfirmedMeasurements {
+  region: MeasurementReport['region'];
+  clothingType: ClothingType | null;
+  /** Every measurement for the region, including invalid and unsupported ones (value null). */
+  measurements: ReviewedMeasurement[];
+  calibration: CalibrationResult;
+  /** `measuredAt` of the scan result these came from. */
+  measuredAt: string;
+  /** ISO 8601 time the user confirmed. */
+  confirmedAt: string;
 }

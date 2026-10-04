@@ -4,6 +4,7 @@ export const PATHS = {
   userInfo: '/details',
   clothing: '/clothing',
   scan: '/scan',
+  measurements: '/measurements',
 } as const;
 
 /** Where the Welcome page's Start button leads. `null` hides navigation and shows the button as unavailable. */
