@@ -1,8 +1,11 @@
 import type { UseCamera } from '../../hooks/useCamera';
+import type { AnnyShadowState } from '../../hooks/useAnnyShadow';
 import type { PoseScanState } from '../../hooks/usePoseScan';
 import { POSE_MODEL_NAME } from '../../services/pose/poseLandmarker';
 import { useAppStore } from '../../store/useAppStore';
+import type { MeasurementReport } from '../../types/measurement';
 import type { ScanCapture, ScanViewId } from '../../types/scan';
+import { compareWithEngine } from '../../utils/anny/shadow';
 import { silhouetteScale } from '../../utils/measurement/calibration';
 import type { ScanRegionDefinition } from '../../utils/pose/scanRegions';
 import type { Coverage } from '../../utils/scan360/session';
@@ -18,9 +21,13 @@ interface PoseDebugPanelProps {
   scanRegion: ScanRegionDefinition;
   captures: Partial<Record<ScanViewId, ScanCapture>>;
   coverage: Coverage;
+  /** Experimental Anny body-model comparison (developer view only). */
+  annyShadow?: AnnyShadowState;
+  /** Production engine result for the same captures, for the comparison. */
+  engineReport?: MeasurementReport | null;
 }
 
-export function PoseDebugPanel({ pose, camera, scanRegion, captures, coverage }: PoseDebugPanelProps) {
+export function PoseDebugPanel({ pose, camera, scanRegion, captures, coverage, annyShadow, engineReport = null }: PoseDebugPanelProps) {
   const userHeightCm = useAppStore((s) => s.userInfo.heightCm);
   const { decision, yaw, outline, frameCounts } = pose;
   const { assessment, stats, silhouette } = pose;
@@ -134,6 +141,7 @@ export function PoseDebugPanel({ pose, camera, scanRegion, captures, coverage }:
       }`,
     ],
   ];
+  if (annyShadow && annyShadow.status !== 'idle') rows.push(...annyRows(annyShadow, engineReport));
   return (
     <section className="pose-debug" aria-label="Pose detection debug values" data-testid="pose-debug">
       <dl>
@@ -146,4 +154,35 @@ export function PoseDebugPanel({ pose, camera, scanRegion, captures, coverage }:
       </dl>
     </section>
   );
+}
+
+const cmText = (value: number | null) => (value === null ? '–' : `${value.toFixed(1)} cm`);
+
+/** Experimental Anny comparison rows (developer view only; never shown to users or stored). */
+function annyRows(state: AnnyShadowState, report: MeasurementReport | null): [string, string][] {
+  if (state.status === 'running') return [['Anny shadow', 'fitting in worker…']];
+  if (state.status === 'unavailable') return [['Anny shadow', `unavailable: ${state.reason}`]];
+  if (state.status === 'error') return [['Anny shadow', `error: ${state.message}`]];
+  if (state.status !== 'done') return [];
+  const { result } = state;
+  const rows: [string, string][] = [
+    ['Anny model', `load ${fixed(state.loadMs, 0)} ms · ${(state.modelBytes / 1e6).toFixed(2)} MB`],
+    [
+      'Anny fit',
+      result.fit
+        ? `worker ${fixed(state.fitMs, 0)} ms · ${result.fit.iterations} iterations${result.fit.converged ? '' : ' (not converged)'} · residual ${fixed(result.fit.rmsResidualCm, 1)} cm · height error ${fixed(result.fit.heightErrorCm, 1)} cm · ${result.fit.viewsUsed.length} views (${result.fit.viewsUsed.join(', ')}) · ${result.fit.rowsUsed} rows`
+        : `worker ${fixed(state.fitMs, 0)} ms`,
+    ],
+  ];
+  if (result.status === 'unavailable') return [...rows, ['Anny shadow', `unavailable: ${result.reason}`]];
+  rows.push(['Anny shadow', 'confidence: experimental · definitions need anthropometric validation · not used for results']);
+  for (const row of compareWithEngine(report, result)) {
+    rows.push([
+      `Anny · ${row.label}`,
+      `current ellipse ${cmText(row.engineCm)}${row.engineStatus ? ` (${row.engineStatus})` : ''} · Anny shadow ${cmText(row.annyCm)} · difference ${
+        row.differenceCm === null ? '–' : `${row.differenceCm > 0 ? '+' : ''}${row.differenceCm.toFixed(1)} cm`
+      }`,
+    ]);
+  }
+  return rows;
 }

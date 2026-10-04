@@ -26,6 +26,7 @@ import { ScanStatus } from '../components/scan/ScanStatus';
 import { ScanViewport } from '../components/scan/ScanViewport';
 import { useCamera } from '../hooks/useCamera';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useAnnyShadow } from '../hooks/useAnnyShadow';
 import { useFrameQuality } from '../hooks/useFrameQuality';
 import { usePoseScan, type PoseScanState } from '../hooks/usePoseScan';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -218,6 +219,15 @@ export function BodyScanPage() {
     navigate(PATHS.measurements);
   };
 
+  // Developer view only: compare the production (ellipse) engine with the experimental Anny body-model fit. Neither is
+  // stored here, and the Anny result never reaches the review page, final measurements or saved data.
+  const shadowEnabled = debug && session.status === 'finished';
+  const engineReport = useMemo(
+    () => (shadowEnabled ? measureCompletedScan({ captures: session.captures, clothingType: clothing?.type, userHeightCm }).report : null),
+    [shadowEnabled, session.captures, clothing?.type, userHeightCm],
+  );
+  const annyShadow = useAnnyShadow({ enabled: shadowEnabled, captures: session.captures, userHeightCm });
+
   return (
     <div ref={pageRef} className="scan-page">
       <motion.div
@@ -387,7 +397,15 @@ export function BodyScanPage() {
           {cameraActive && !immersive && <ScanControls session={session} onReview={reviewMeasurements} />}
 
           {debug && cameraActive && (
-            <PoseDebugPanel pose={pose} camera={camera} scanRegion={scanRegion} captures={session.captures} coverage={session.coverage} />
+            <PoseDebugPanel
+              pose={pose}
+              camera={camera}
+              scanRegion={scanRegion}
+              captures={session.captures}
+              coverage={session.coverage}
+              annyShadow={annyShadow}
+              engineReport={engineReport}
+            />
           )}
         </motion.section>
 
