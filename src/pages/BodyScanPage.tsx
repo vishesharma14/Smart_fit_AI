@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router';
 import {
@@ -49,6 +49,9 @@ import { trackingQuality } from '../utils/scan360/trackingQuality';
 import { SCAN_VIEWS, VIEW_BY_ID } from '../utils/scan360/views';
 import type { ScanCapture, ScanViewId } from '../types/scan';
 import './BodyScanPage.css';
+
+// Developer-only validation panel (`?poseDebug`): loaded on demand, so normal scans never download it.
+const ValidationPanel = lazy(() => import('../components/scan/validation/ValidationPanel').then((m) => ({ default: m.ValidationPanel })));
 
 /**
  * Phones and touch tablets (portrait or landscape) get a full-screen scan view
@@ -406,6 +409,17 @@ export function BodyScanPage() {
               annyShadow={annyShadow}
               engineReport={engineReport}
             />
+          )}
+
+          {debug && (
+            <Suspense fallback={null}>
+              <ValidationPanel
+                scanFinished={session.status === 'finished'}
+                captures={session.captures}
+                userHeightCm={userHeightCm}
+                annyShadow={annyShadow}
+              />
+            </Suspense>
           )}
         </motion.section>
 

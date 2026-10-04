@@ -1,0 +1,106 @@
+import type { AnnyShadowState } from '../../hooks/useAnnyShadow';
+import type { MeasurementReport } from '../../types/measurement';
+import type { ScanCapture, ScanViewId } from '../../types/scan';
+import type {
+  ClothingFit,
+  LightingCondition,
+  RecordedAnnyInfo,
+  RecordedPredictions,
+  ValidationCameraType,
+  ValidationDeviceType,
+  ValidationScanAttempt,
+  WornClothingType,
+} from '../../types/validation';
+import { measureScan } from '../measurement/measureScan';
+import { SCAN_VIEWS } from '../scan360/views';
+import { VALIDATION_MEASUREMENT_IDS } from './definitions';
+
+/*
+ * Builds a validation attempt from a finished scan: the production engine's values and the Anny shadow's values,
+ * plus metadata. Only numbers and labels are copied — never the captures themselves (landmarks, outlines).
+ */
+
+/**
+ * The production engine on the full body, so all eight compared measurements exist whatever garment is selected.
+ * Same engine and formulas as the review page; only the region filter differs.
+ */
+export function measureForValidation(
+  captures: Partial<Record<ScanViewId, ScanCapture>>,
+  userHeightCm: number | null,
+): MeasurementReport {
+  return measureScan({ captures, region: 'full', userHeightCm });
+}
+
+export function recordEllipse(report: MeasurementReport): RecordedPredictions {
+  return Object.fromEntries(
+    VALIDATION_MEASUREMENT_IDS.map((id) => {
+      const m = report.measurements.find((x) => x.id === id);
+      if (!m) return [id, { valueCm: null, status: 'invalid', reason: 'not measured by the engine' }];
+      if (m.value === null) return [id, { valueCm: null, status: m.status, reason: m.reason ?? 'no value' }];
+      if (m.unit !== 'cm') return [id, { valueCm: null, status: m.status, reason: 'no real-world scale (model units)' }];
+      return [id, { valueCm: m.value, status: m.status }];
+    }),
+  ) as RecordedPredictions;
+}
+
+const annyUnavailable = (reason: string): RecordedPredictions =>
+  Object.fromEntries(VALIDATION_MEASUREMENT_IDS.map((id) => [id, { valueCm: null, status: 'unavailable', reason }])) as RecordedPredictions;
+
+export function recordAnny(state: AnnyShadowState): { predictions: RecordedPredictions; info: RecordedAnnyInfo } {
+  const empty = { rmsResidualCm: null, heightErrorCm: null, iterations: null, workerMs: null, viewsUsed: [] };
+  if (state.status === 'idle' || state.status === 'running')
+    return { predictions: annyUnavailable('the Anny fit did not run'), info: { status: 'not-run', ...empty } };
+  if (state.status === 'unavailable')
+    return { predictions: annyUnavailable(state.reason), info: { status: 'unavailable', reason: state.reason, ...empty } };
+  if (state.status === 'error')
+    return { predictions: annyUnavailable(state.message), info: { status: 'error', reason: state.message, ...empty } };
+  const { result } = state;
+  const info: RecordedAnnyInfo = {
+    status: result.status,
+    ...(result.status === 'unavailable' ? { reason: result.reason } : {}),
+    rmsResidualCm: result.fit?.rmsResidualCm ?? null,
+    heightErrorCm: result.fit?.heightErrorCm ?? null,
+    iterations: result.fit?.iterations ?? null,
+    workerMs: Math.round(state.loadMs + state.fitMs),
+    viewsUsed: result.fit ? [...result.fit.viewsUsed] : [],
+  };
+  if (result.status === 'unavailable') return { predictions: annyUnavailable(result.reason), info };
+  const predictions = Object.fromEntries(
+    VALIDATION_MEASUREMENT_IDS.map((id) => {
+      const value = result.measurements.find((m) => m.id === id)?.valueCm ?? null;
+      return [id, value === null ? { valueCm: null, status: 'unavailable', reason: 'not measured on the fitted body' } : { valueCm: value, status: 'ok' }];
+    }),
+  ) as RecordedPredictions;
+  return { predictions, info };
+}
+
+export interface ScanAttemptMeta {
+  attempt: number;
+  clothingType: WornClothingType;
+  clothingFit: ClothingFit;
+  deviceType: ValidationDeviceType;
+  cameraType: ValidationCameraType;
+  lighting: LightingCondition;
+}
+
+export function buildScanAttempt(input: {
+  meta: ScanAttemptMeta;
+  report: MeasurementReport;
+  annyShadow: AnnyShadowState;
+  captures: Partial<Record<ScanViewId, ScanCapture>>;
+  enteredHeightCm: number | null;
+  now?: Date;
+}): ValidationScanAttempt {
+  const { meta, report, annyShadow, captures, enteredHeightCm, now = new Date() } = input;
+  const anny = recordAnny(annyShadow);
+  return {
+    ...meta,
+    timestamp: now.toISOString(),
+    enteredHeightCm,
+    viewsCaptured: SCAN_VIEWS.map((view) => view.id).filter((id) => captures[id]),
+    ellipse: recordEllipse(report),
+    ellipseCalibration: report.calibration.method,
+    anny: anny.predictions,
+    annyInfo: anny.info,
+  };
+}

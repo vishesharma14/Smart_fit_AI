@@ -38,7 +38,7 @@ Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Informati
 4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
-9E-2 (Anny body-model shadow mode, developer view only).
+9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -121,6 +121,19 @@ input, `shadow` = reliability gate + comparison) runs in `workers/annyFit.worker
 (residual > 2 cm, height mismatch, out-of-range shape) are `unavailable`. All Anny measurement definitions need
 anthropometric validation; results are never used for the review page, final measurements, size prediction or
 saved data. The production ellipse engine is unchanged.
+Validation mode (Step 9E-3A, experimental, `?poseDebug` only): `components/scan/validation/ValidationPanel` (lazy-loaded)
+records an anonymous test subject (ID = letters/digits/hyphens only, tape height) with manual tape measurements
+(`TapeMeasurement { name, value, unit 'cm', notes? }` for chest, waist, hip, thigh, inseam, shoulder width, arm length,
+leg length; empty = not taped, never filled in; `utils/validation/groundTruth.ts` checks numbers/ranges/IDs) and, per
+finished scan, a `ValidationScanAttempt` (types in `types/validation.ts`): attempt number, timestamp, clothing worn + fit,
+device, camera, lighting, entered height, views, the production engine's values (`fromScan.ts`: `measureScan` with
+region `full`, formulas unchanged) and the Anny shadow's values + fit info (residual, height error, worker time, views).
+`compare.ts` (signed = scan − tape, abs, %; unavailable predictions get no value or error), `metrics.ts` (MAE, bias,
+median/max abs, valid and unavailable counts per engine, overall and per measurement), `repeatability.ts` (scan 1 vs
+each later scan, as differences — never ground truth), `export.ts` (JSON/CSV built from whitelisted fields;
+`assertExportSafe` rejects landmark/outline/mask/frame/image fields, binary data and data URLs; CSV cells are
+formula-escaped). Records live in `store/validationStore.ts` (memory only, not persisted). `syntheticFixture.ts` is
+SYNTHETIC test data for tests only. No accuracy claims: nothing has been validated on real people yet.
 **No size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
@@ -154,6 +167,7 @@ src/
   components/scan/    ScanViewport (camera + states), BodyGuideOverlay (scan frame + one 3D
                       reference mannequin), ScanStatus (+ capture progress), ScanCoverage (360° ring),
                       PoseDebugOverlay / PoseDebugPanel (?poseDebug only)
+  components/scan/validation/  ValidationPanel (?poseDebug only, lazy): tape ground truth, scan records, metrics, export
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
@@ -163,12 +177,14 @@ src/
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
                       (user, fit, settings); only display units/theme/voice preference are persisted;
-                      user slice holds scanMeasurements (engine output) and measurements (confirmed)
+                      user slice holds scanMeasurements (engine output) and measurements (confirmed);
+                      validationStore = separate in-memory store for validation records (never persisted)
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
                       useCamera, useFrameQuality, useScan360Session, usePoseScan, useVoiceGuidance,
                       useMediaQuery, useScrollLock, useWakeLock, useAnnyShadow)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
-                      frame analysis, pose/poseLandmarker = MediaPipe engine + mask reader, speech)
+                      frame analysis, pose/poseLandmarker = MediaPipe engine + mask reader, speech,
+                      download = save a developer export locally)
   utils/              pure helpers: constants, motion presets, unit conversion,
                       user-info validation, clothing catalog + validation,
                       scan guidance, scanPreview, pose/ (landmarks, orientation,
@@ -180,6 +196,8 @@ src/
                       testBody = synthetic mask incl. angled views (tests only)
   utils/anny/         Anny shadow model (Step 9E-2): format, model, slice, fit, measure, scanInput, shadow,
                       workerProtocol; testModel (tests only)
+  utils/validation/   real-person validation (Step 9E-3A): definitions, groundTruth, compare, metrics,
+                      repeatability, fromScan, export (+ privacy guard); syntheticFixture (tests only)
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),
@@ -190,6 +208,7 @@ src/
   types/pose.ts       pose landmark types
   types/measurement.ts  measurement / calibration / report types
   types/silhouette.ts   body-outline profile types (numbers only, never the mask)
+  types/validation.ts   validation subject / tape measurement / scan attempt types (numbers and labels only)
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 
