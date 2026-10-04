@@ -37,7 +37,7 @@ current step explicitly asks for it.**
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
 4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
-8 (measurement review and confirmation).
+8 (measurement review and confirmation), 9B (silhouette measurements).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -75,8 +75,7 @@ Measurement engine (Step 7, `utils/measurement/`, pure and unit-tested):
 Lengths between joints are measured on the captures' 3D world landmarks per angle and combined across
 angles (weighted median; agreement, visibility and angle coverage drive confidence): shoulder width
 (joint centres), arm length, torso length (upper/full) and leg length hip→ankle (lower/full).
-Girths (chest, waist, hip, thigh) and inseam are `unsupported` — joint landmarks don't describe the body
-surface or the crotch — and never get a value. Pixels are never treated as cm: scale comes from a
+Girths and inseam come from the body outline (Step 9B, below). Pixels are never treated as cm: joint-length scale comes from a
 calibration — `user-height` (entered height ÷ stature from a full-body front/back capture; the only one
 that allows `valid`), else `pose-model-metric` (model's metre estimate, low confidence → at most
 `uncertain`), else `none` (model units). Statuses: valid / uncertain / invalid (no value) / unsupported.
@@ -88,14 +87,28 @@ level and reason. Only measurements with a value (valid/uncertain, cm) can be ed
 and kept exactly as typed (`utils/measurement/review.ts`); edits keep the engine's status/confidence and set
 `manuallyEdited` (+ `measuredValue`). "Confirm Measurements" stores `ConfirmedMeasurements` as `measurements`
 in the user slice (in memory only; a new scan result clears an older confirmation) — the input for size
-prediction later. **No size prediction or size charts exist yet.**
-`?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
-the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
+prediction later.
+Silhouette measurements (Step 9B): the Pose Landmarker runs with `outputSegmentationMasks: true` (same model). The
+mask is read only inside the detection callback (`detect(video, ts, readMask)`), only during a hold or in
+`?poseDebug`, and turned straight into numbers by `utils/silhouette/extract.ts` (per-row edge runs seeded from the
+joints, head top / floor traced along connected runs, crotch = top of the leg gap); it is never copied, stored or
+uploaded. `combine.ts` takes the per-row median over the hold frames (+ width jitter) → `ScanCapture.silhouette`
+(optional: a missing/poor outline never blocks or alters a capture; capture rules are unchanged). Every scan now
+validates the full body (`SCAN_FRAMING_REGION`) so the entered height can scale each capture
+(`silhouetteScale`: height ÷ outline head-top-to-floor, per capture; views whose outline height is >8% off the
+median are left out). `levels.ts` finds chest / waist / hip / thigh rows on front/back outlines (arms/hands must be
+clear) and reads side depth at the same height fraction; `utils/measurement/silhouetteMeasure.ts` gives girths as
+ellipse perimeters (width × depth) and inseam = crotch→floor, with confidence from edge sharpness, steadiness, scale
+trust, view agreement, coverage and a model factor. **Outline measurements are capped at `uncertain` until validated
+against tape measurements of real people.** Tunables: `utils/silhouette/silhouetteConfig.ts`, `SILHOUETTE_MEASUREMENT`.
+**No size prediction or size charts exist yet.**
+`?poseDebug` shows a developer panel + skeleton, plus the live outline edges, head top / floor / crotch and the
+measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
 full height, sets the minimum zoom only when the camera exposes zoom, and the
 preview follows a portrait stream's shape (never cropping head/feet).
-Scan regions (`utils/pose/scanRegions.ts`): the selected clothing decides the validated region —
-T-shirt/Shirt/Blazer → upper body (face to just below the hips, feet not required),
-Jeans/Trousers → lower body (waist to feet, head not required), nothing selected → full body.
+Scan regions (`utils/pose/scanRegions.ts`): every scan validates the full body (`SCAN_FRAMING_REGION`, Step 9B);
+the selected clothing decides the measurement region — T-shirt/Shirt/Blazer → upper body,
+Jeans/Trousers → lower body, nothing selected → full body (the upper/lower framing definitions remain available).
 Each region defines framing bounds, required landmarks, edge points, posture checks, stillness
 points and copy; one shared pipeline (assessPose/usePoseScan) applies it. Orientation votes only
 use cues actually in the camera's view. MediaPipe detects people from the head/upper body, so a
@@ -134,18 +147,22 @@ src/
                       useCamera, useFrameQuality, useScanSession, usePoseScan, useVoiceGuidance,
                       useMediaQuery, useScrollLock, useWakeLock)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
-                      frame analysis, pose/poseLandmarker = MediaPipe engine, speech)
+                      frame analysis, pose/poseLandmarker = MediaPipe engine + mask reader, speech)
   utils/              pure helpers: constants, motion presets, unit conversion,
                       user-info validation, clothing catalog + validation,
                       scan phases + scan guidance, scanPreview, pose/ (landmarks, orientation,
                       validation + capture hold, config, scanRegions = clothing → body region)
+  utils/silhouette/   body outline from the segmentation mask: extract (per frame), combine (median profile),
+                      levels (chest/waist/hip/thigh rows, side depth), config; testBody = synthetic mask (tests only)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),
-                      review (edit/confirm rules); tests + testFixtures (tests only)
+                      review (edit/confirm rules), silhouetteMeasure (outline girths + inseam);
+                      tests + testFixtures (tests only)
   types/domain.ts     domain types (lengths in cm, weight in kg)
   types/scan.ts       scan/camera types (ScanCapture = landmark snapshot)
   types/pose.ts       pose landmark types
   types/measurement.ts  measurement / calibration / report types
+  types/silhouette.ts   body-outline profile types (numbers only, never the mask)
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 

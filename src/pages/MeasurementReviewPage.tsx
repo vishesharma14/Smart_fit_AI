@@ -23,10 +23,10 @@ import {
   type DraftValues,
 } from '../utils/measurement/review';
 import { fadeUpItem } from '../utils/motion';
-import { SCAN_REGIONS } from '../utils/pose/scanRegions';
 import './MeasurementReviewPage.css';
 
 const TITLE_ID = 'measurements-title';
+const REGION_LABELS = { full: 'Full body', upper: 'Upper body', lower: 'Lower body' } as const;
 
 /** Step 4 of the fit flow: review, optionally correct, and confirm the measurements from the scan. */
 export function MeasurementReviewPage() {
@@ -45,13 +45,15 @@ export function MeasurementReviewPage() {
           Your <span className="flow-step__title-accent">measurements</span>
         </>
       }
-      lead="Calculated on this device from the joint positions captured in your scan. Check them, correct any you know, then confirm."
+      lead="Calculated on this device from the joint positions and body outline captured in your scan. Check them, correct any you know, then confirm."
       introExtra={
         <p className="measure-review__disclaimer">
           <Info aria-hidden="true" size={18} strokeWidth={1.75} />
           <span>
             These are estimates from a camera scan, not tailor or medical measurements. Each one shows how confident the
-            scan is, and measurements the scan can’t provide are marked unavailable rather than guessed.
+            scan is, and measurements the scan can’t provide are marked unavailable rather than guessed. Circumferences and
+            inseam come from your body outline and stay marked uncertain until they have been checked against tape
+            measurements.
           </span>
         </p>
       }
@@ -97,7 +99,6 @@ function Review({ result, confirmed, onConfirm }: ReviewProps) {
   const anyEditable = measurements.some(isEditable);
   const isConfirmed = confirmed?.measuredAt === result.measuredAt && confirmed.measurements === measurements;
   const { report } = result;
-  const region = SCAN_REGIONS[report.region];
 
   const startEditing = () => {
     setDrafts(Object.fromEntries(measurements.filter(isEditable).map((m) => [m.id, draftFor(m)])));
@@ -129,9 +130,9 @@ function Review({ result, confirmed, onConfirm }: ReviewProps) {
     <FlowStepForm titleId={TITLE_ID} onSubmit={handleSubmit}>
       <motion.div className="measure-review__context" variants={fadeUpItem}>
         <p>
-          <span className="measure-review__context-label">Scan</span>
+          <span className="measure-review__context-label">Measured for</span>
           <span className="measure-review__context-value">
-            {region.label}
+            {REGION_LABELS[report.region]}
             {result.clothingType ? ` · ${getClothingItem(result.clothingType).label}` : ''}
           </span>
         </p>

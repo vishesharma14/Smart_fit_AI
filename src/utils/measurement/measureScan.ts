@@ -3,11 +3,13 @@ import type { ScanCapture, ScanPhaseId } from '../../types/scan';
 import type { ScanRegionId } from '../pose/scanRegions';
 import { aggregateSamples, angleCoverage, combineConfidence, statusFromConfidence, type AngleSample } from './aggregate';
 import { applyCalibration, calibrateFromUserHeight, chooseCalibration, poseModelMetricCalibration } from './calibration';
-import { definitionsForRegion, type SupportedDefinition, type UnsupportedDefinition } from './definitions';
+import { definitionsForRegion, type LandmarkDefinition, type UnsupportedDefinition } from './definitions';
+import { measureSilhouette } from './silhouetteMeasure';
 
 /*
  * The measurement engine: turns the scan's captured angles (averaged pose
- * landmarks, no images) into body measurements for the scanned region.
+ * landmarks and body-outline numbers, no images) into body measurements for
+ * the region of the selected garment.
  *
  * Deterministic and pure: the same captures and height always give the same
  * report. Nothing is invented — a measurement without enough evidence is
@@ -42,7 +44,8 @@ function usableCaptures(input: MeasureScanInput): { captures: ScanCapture[]; war
     if (!capture) continue;
     if (capture.phase !== phase) {
       warnings.push(`The ${phase} capture is labelled "${capture.phase}" and was ignored.`);
-    } else if (capture.scanRegion !== input.region) {
+    } else if (capture.scanRegion !== input.region && capture.scanRegion !== 'full') {
+      // A full-body capture serves every region; a partial one only its own.
       warnings.push(`The ${phase} capture was taken for the ${capture.scanRegion} region, not ${input.region}, and was ignored.`);
     } else if (
       !Array.isArray(capture.landmarks) ||
@@ -72,7 +75,7 @@ function unsupported(definition: UnsupportedDefinition, calibration: Calibration
   };
 }
 
-function measure(definition: SupportedDefinition, captures: ScanCapture[], calibration: CalibrationResult): Measurement {
+function measure(definition: LandmarkDefinition, captures: ScanCapture[], calibration: CalibrationResult): Measurement {
   const base = {
     id: definition.id,
     name: definition.name,
@@ -152,7 +155,11 @@ export function measureScan(input: MeasureScanInput): MeasurementReport {
     poseModelMetricCalibration(),
   ]);
   const measurements = definitionsForRegion(input.region).map((definition) =>
-    definition.supported ? measure(definition, captures, calibration) : unsupported(definition, calibration),
+    definition.kind === 'landmark'
+      ? measure(definition, captures, calibration)
+      : definition.kind === 'silhouette'
+        ? measureSilhouette(definition, captures, input.userHeightCm)
+        : unsupported(definition, calibration),
   );
   return {
     region: input.region,
