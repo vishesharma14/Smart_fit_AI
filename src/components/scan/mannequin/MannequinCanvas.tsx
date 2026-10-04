@@ -4,9 +4,13 @@ import { EASE_OUT } from '../../../utils/motion';
 import { MannequinScene, isWebGLAvailable } from './MannequinScene';
 import './MannequinCanvas.css';
 
+const FULL_RANGE: [number, number] = [0, 1];
+
 interface MannequinCanvasProps {
   /** Target rotation in radians (0 = facing the camera). */
   yaw: number;
+  /** Vertical part of the figure to show (0 = feet, 1 = head top). */
+  range?: [number, number];
 }
 
 /**
@@ -14,10 +18,12 @@ interface MannequinCanvasProps {
  * code is only downloaded once the camera preview is shown. Draws only on
  * resize and while turning to a new angle.
  */
-export default function MannequinCanvas({ yaw }: MannequinCanvasProps) {
+export default function MannequinCanvas({ yaw, range = FULL_RANGE }: MannequinCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MannequinScene | null>(null);
   const currentYawRef = useRef(yaw);
+  const rangeRef = useRef(range);
+  const [rangeBottom, rangeTop] = range;
   const reduceMotion = useReducedMotion();
   const [supported] = useState(isWebGLAvailable);
   const [ready, setReady] = useState(false);
@@ -35,6 +41,7 @@ export default function MannequinCanvas({ yaw }: MannequinCanvasProps) {
     container.appendChild(scene.canvas);
     sceneRef.current = scene;
     scene.setYaw(currentYawRef.current);
+    scene.setRange(...rangeRef.current);
 
     const resize = () => scene.setSize(container.clientWidth, container.clientHeight);
     resize();
@@ -49,6 +56,12 @@ export default function MannequinCanvas({ yaw }: MannequinCanvasProps) {
       sceneRef.current = null;
     };
   }, [supported]);
+
+  // Frame the requested part of the figure.
+  useEffect(() => {
+    rangeRef.current = [rangeBottom, rangeTop];
+    sceneRef.current?.setRange(rangeBottom, rangeTop);
+  }, [rangeBottom, rangeTop]);
 
   // Turn to the new angle only when it changes — no idle animation.
   useEffect(() => {

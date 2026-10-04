@@ -71,6 +71,36 @@
   color: var(--color-text);
 }
 
+.scan-page__region {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 34rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgb(34 211 238 / 0.28);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgb(34 211 238 / 0.08), rgb(139 92 246 / 0.06));
+}
+
+.scan-page__region-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-secondary);
+}
+
+.scan-page__region-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+}
+
+.scan-page__region-text {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 .scan-page__title {
   font-family: var(--font-display);
   font-size: clamp(2rem, 1.4rem + 2.4vw, 3rem);
@@ -91,7 +121,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  width: min(100%, 30rem);
+  /* Narrow enough that the whole preview fits on screen, whatever its shape */
+  width: min(100%, 30rem, calc((100dvh - 6rem) * var(--preview-aspect, 0.75)));
   justify-self: center;
 }
 
@@ -133,7 +164,23 @@
 .scan-page__engine-note svg {
   flex-shrink: 0;
   margin-top: 0.2em;
-  color: var(--color-warning);
+  color: var(--color-secondary);
+}
+
+.scan-page__engine-note--error svg {
+  color: var(--color-danger);
+}
+
+.scan-page__text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .scan-page__phases {
@@ -232,11 +279,220 @@
   .scan-page__stage {
     position: sticky;
     top: var(--space-6);
-    /* Keep the whole 3:4 preview on screen */
-    width: min(100%, calc((100dvh - 10rem) * 0.75), 34rem);
+    /* Keep the whole preview on screen */
+    width: min(100%, calc((100dvh - 10rem) * var(--preview-aspect, 0.75)), 34rem);
   }
 
   .scan-page__controls {
     flex-direction: column;
+  }
+}
+
+/* Guidance + controls below the preview (on desktop it only holds the camera buttons) */
+.scan-page__dock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Preview wrapper (sizes the preview in the full-screen phone view) */
+.scan-page__preview {
+  display: flex;
+  justify-content: center;
+}
+
+/*
+ * Full-screen phone scan (while the camera is on): angle strip on top, the
+ * largest preview that fits the camera's own shape (never stretched), the
+ * large instruction over it, and touch-sized controls at the bottom.
+ */
+.scan-page__stage--immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  /* Fill the screen (a centred grid item would otherwise shrink to its content) */
+  justify-self: stretch;
+  align-self: stretch;
+  height: auto;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  width: auto;
+  padding: max(env(safe-area-inset-top), var(--space-2)) max(env(safe-area-inset-right), var(--space-2))
+    max(env(safe-area-inset-bottom), var(--space-3)) max(env(safe-area-inset-left), var(--space-2));
+  background: #03050c;
+  overscroll-behavior: contain;
+}
+
+.scan-page__immersive-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.scan-page__rotate-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.scan-page__stage--immersive .scan-page__preview {
+  min-height: 0;
+  container-type: size;
+  align-items: center;
+  /* No panning or pinch-zoom over the preview while scanning */
+  touch-action: none;
+}
+
+.scan-page__stage--immersive .scan-viewport {
+  /* As large as fits, in the preview's own aspect ratio */
+  width: min(100cqw, calc(100cqh * var(--preview-aspect, 0.75)));
+  border-radius: var(--radius-lg);
+}
+
+.scan-page__stage--immersive .scan-instruction {
+  width: min(94%, 30rem);
+}
+
+/* Readable from a few steps away on a phone */
+.scan-page__stage--immersive .scan-instruction__text {
+  font-size: clamp(1.5rem, 7vw, 2.25rem);
+}
+
+.scan-page__stage--immersive .scan-page__camera-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  touch-action: manipulation;
+}
+
+.scan-page__stage--immersive .scan-page__camera-actions > .button {
+  min-height: 3rem;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+/* Scan controls span the full width above the camera buttons */
+.scan-page__stage--immersive .scan-page__controls {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.scan-page__stage--immersive .scan-page__controls .button {
+  min-height: 3.25rem;
+  padding: 0 var(--space-3);
+}
+
+.scan-page__stage--immersive .scan-page__controls > :only-child,
+.scan-page__stage--immersive .scan-page__next-note {
+  grid-column: 1 / -1;
+}
+
+/* Phone rotated to landscape: preview on the left, controls in a column on the right */
+.scan-page__stage--immersive.scan-page__stage--landscape {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  grid-template-areas:
+    'top top'
+    'preview actions';
+}
+
+.scan-page__stage--landscape .scan-page__immersive-top {
+  grid-area: top;
+}
+
+.scan-page__stage--landscape .scan-page__preview {
+  grid-area: preview;
+}
+
+.scan-page__stage--landscape .scan-page__dock {
+  grid-area: actions;
+  align-self: center;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.scan-page__stage--landscape .scan-page__camera-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scan-page__stage--immersive.scan-page__stage--landscape .scan-status {
+  height: auto;
+  min-height: 5rem;
+}
+
+/* Short landscape screens: the instruction alone; its detail is secondary */
+.scan-page__stage--immersive.scan-page__stage--landscape .scan-status__detail {
+  display: none;
+}
+
+.scan-page__stage--immersive.scan-page__stage--landscape .scan-status__title {
+  font-size: clamp(1.05rem, 5vh, 1.35rem);
+}
+
+.scan-page__stage--landscape .scan-page__controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scan-page__stage--landscape .scan-instruction__text {
+  font-size: clamp(1.25rem, 6vh, 2rem);
+}
+
+/*
+ * Bottom dock on phones: the current instruction, its detail and the hold
+ * progress sit right above the controls, in thumb reach, instead of over the
+ * preview. The status area has a fixed height (two lines each, clamped) so
+ * changing instructions never resize the preview.
+ */
+.scan-page__stage--immersive .scan-page__dock {
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: var(--radius-xl);
+  background: rgb(12 16 30 / 0.92);
+}
+
+.scan-page__stage--immersive .scan-status {
+  height: 8.5rem;
+  overflow: hidden;
+  padding: var(--space-3) var(--space-4);
+  border-color: transparent;
+  border-left-width: 4px;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.scan-page__stage--immersive .scan-status__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  /* Readable from a few steps away */
+  font-size: clamp(1.35rem, 6.2vw, 1.75rem);
+  line-height: 1.2;
+}
+
+.scan-page__stage--immersive .scan-status__detail {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* Narrow phones: tighter page rhythm (less desktop-style whitespace). Kept last so it overrides the base rules. */
+@media (max-width: 29.99rem) {
+  .scan-page {
+    padding-block: var(--space-4) var(--space-8);
+  }
+
+  .scan-page__layout {
+    gap: var(--space-4);
+    padding-top: var(--space-5);
+  }
+
+  .scan-page__panel {
+    gap: var(--space-4);
+    padding: var(--space-4);
   }
 }

@@ -109,8 +109,14 @@ const FLOOR_VERTEX = /* glsl */ `
 
 /** Lens and framing: a slightly long lens (less distortion) looking a little down at the figure. */
 const FOV = 24;
-/** Fraction of the view height the figure occupies, leaving room for the frame and labels. */
-const FILL = 0.74;
+/**
+ * Fraction of the view height the figure occupies, leaving room for the frame
+ * and labels. Close to the size a person can fill while staying fully in view,
+ * so the guide doesn't suggest standing farther away than needed.
+ */
+const FILL = 0.82;
+/** Fill for a partial (upper- or lower-body) view. */
+const PARTIAL_FILL = 0.9;
 const CAMERA_LIFT = 0.55;
 
 export function isWebGLAvailable(): boolean {
@@ -133,6 +139,10 @@ export class MannequinScene {
   private readonly figure = new Group();
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: Material[] = [];
+  /** Vertical part of the figure in view (0 = feet, 1 = head top). */
+  private range: [number, number] = [0, 1];
+  private width = 0;
+  private height = 0;
 
   /** The scene owns its canvas so every instance gets a fresh WebGL context. */
   readonly canvas: HTMLCanvasElement;
@@ -197,19 +207,41 @@ export class MannequinScene {
   /** Resizes the drawing buffer and reframes the figure for the new aspect ratio. */
   setSize(width: number, height: number): void {
     if (width === 0 || height === 0) return;
+    this.width = width;
+    this.height = height;
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
+    this.frame();
+  }
 
-    const centreY = FIGURE_HEIGHT / 2;
+  /**
+   * Shows only part of the figure — e.g. the upper body for a shirt scan —
+   * as fractions of its height (0 = feet, 1 = head top).
+   */
+  setRange(bottom: number, top: number): void {
+    this.range = [bottom, top];
+    this.frame();
+  }
+
+  /** Points the camera at the current range so it fills FILL of the view. */
+  private frame(): void {
+    if (this.width === 0 || this.height === 0) return;
+    const [bottom, top] = this.range;
+    const partial = top - bottom < 1;
+    const span = (top - bottom) * FIGURE_HEIGHT;
+    const centreY = ((bottom + top) / 2) * FIGURE_HEIGHT;
+    // A partial view runs off the frame edges anyway, so it may fill more of the height.
+    const fill = partial ? PARTIAL_FILL : FILL;
     const halfFov = ((FOV / 2) * Math.PI) / 180;
-    // Distance at which the figure fills FILL of the height (or of the width on very wide frames).
-    const byHeight = FIGURE_HEIGHT / 2 / FILL / Math.tan(halfFov);
+    // Distance at which the range fills `fill` of the height (or the figure fills it across, on very wide frames).
+    const byHeight = span / 2 / fill / Math.tan(halfFov);
     const figureWidth = 1.3;
-    const byWidth = figureWidth / 2 / FILL / (Math.tan(halfFov) * this.camera.aspect);
+    const byWidth = figureWidth / 2 / fill / (Math.tan(halfFov) * this.camera.aspect);
     const distance = Math.max(byHeight, byWidth);
+    const lift = CAMERA_LIFT * (top - bottom);
 
-    this.camera.position.set(0, centreY + CAMERA_LIFT, distance);
-    this.camera.lookAt(0, centreY - 0.06, 0);
+    this.camera.position.set(0, centreY + lift, distance);
+    this.camera.lookAt(0, centreY - 0.06 * (top - bottom), 0);
     this.camera.updateProjectionMatrix();
     this.render();
   }

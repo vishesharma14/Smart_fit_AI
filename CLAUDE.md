@@ -35,22 +35,69 @@ current step explicitly asks for it.**
 ## 2. Current Repository State
 
 Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Information),
-4 (Clothing Selection), 5 (Body Scan foundation).
+4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
+clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4).
 
 Body Scan status: real camera (getUserMedia, video only) with on-device lighting
-and movement checks. **No body/pose detection engine is connected**
-(`services/bodyDetection.ts` exports `bodyDetector = null`), so the page runs as a
-labelled "scan guidance preview": angles can only be *previewed*, never *captured*,
-and no measurements exist. Scan session state is local to the page (no global state).
+and movement checks plus **MediaPipe Pose Landmarker (Full model)** running on-device
+(`@mediapipe/tasks-vision`; model in `public/models/`, wasm bundled — no CDN, no
+upload). Per frame: one person, framing/distance, joint visibility, orientation
+(front / turned left / back / turned right, from several voting signals),
+upright, arms and stance, stillness. An angle is auto-captured only after the pose
+stays valid for `captureHoldMs` (1.5 s) and `captureMinFrames` consecutive frames
+(`utils/pose/poseConfig.ts`); the capture keeps averaged landmarks only, never
+images. Only frames that pass every check enter the capture buffer (any invalid frame
+empties it); `buildCaptureFromHold` refuses an inconsistent buffer; the detection loop
+stops once its angle is captured, and the session reducer locks captured angles (one
+capture per angle, never overwritten). The flow is automatic: front → left → back →
+right → complete, with no manual capture.
+Scan guidance: one primary instruction shown large over the camera preview (`ScanInstruction`)
+plus the status panel; optional voice guidance (`useVoiceGuidance` → `utils/voiceSchedule.ts`
+scheduler → `services/speech.ts`, browser SpeechSynthesis only, prefers a male English system
+voice) speaks the same instruction with settle/min-gap/repeat rules so it never repeats per
+frame. Voice is output only — it never affects detection or capture. The voice on/off
+preference is persisted with the other display settings.
+Phones/touch tablets: while the camera is on, the scan stage becomes a full-screen view
+(compact angle strip on top, largest undistorted preview, and a bottom dock with the status /
+instruction / hold progress above 48px+ controls; fixed-height status so the preview never
+resizes; page behind inert and scroll-locked; landscape phones get the dock as a side column).
+`viewport-fit=cover` + `env(safe-area-inset-*)` keep content clear of notches and the home
+indicator. Touch devices start
+with the rear camera (falls back to any camera); the screen is kept awake with the Wake Lock
+API where supported. Desktop keeps the page layout.
+Measurement engine (Step 7, `utils/measurement/`, pure and unit-tested, **not yet wired into the UI**):
+`measureScan({ captures, region, userHeightCm })` → `MeasurementReport` (types in `types/measurement.ts`).
+Lengths between joints are measured on the captures' 3D world landmarks per angle and combined across
+angles (weighted median; agreement, visibility and angle coverage drive confidence): shoulder width
+(joint centres), arm length, torso length (upper/full) and leg length hip→ankle (lower/full).
+Girths (chest, waist, hip, thigh) and inseam are `unsupported` — joint landmarks don't describe the body
+surface or the crotch — and never get a value. Pixels are never treated as cm: scale comes from a
+calibration — `user-height` (entered height ÷ stature from a full-body front/back capture; the only one
+that allows `valid`), else `pose-model-metric` (model's metre estimate, low confidence → at most
+`uncertain`), else `none` (model units). Statuses: valid / uncertain / invalid (no value) / unsupported.
+**No size prediction or size charts exist yet.**
+`?poseDebug` shows a developer panel + skeleton (`&poseDelegate=CPU|GPU` forces
+the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
+full height, sets the minimum zoom only when the camera exposes zoom, and the
+preview follows a portrait stream's shape (never cropping head/feet).
+Scan regions (`utils/pose/scanRegions.ts`): the selected clothing decides the validated region —
+T-shirt/Shirt/Blazer → upper body (face to just below the hips, feet not required),
+Jeans/Trousers → lower body (waist to feet, head not required), nothing selected → full body.
+Each region defines framing bounds, required landmarks, edge points, posture checks, stillness
+points and copy; one shared pipeline (assessPose/usePoseScan) applies it. Orientation votes only
+use cues actually in the camera's view. MediaPipe detects people from the head/upper body, so a
+legs-only frame can't be detected; tracking can continue once detected.
+Scan session state is local to the page (no global state).
 User information and the clothing selection are kept in memory only (not
-persisted); height/weight display units and theme are persisted.
+persisted); height/weight display units, theme and the voice-guidance preference are persisted.
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
 Back/Continue) and `components/form/FormCard`.
 
-Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm run preview`.
+Scripts: `npm run dev`, `npm run build` (`tsc -b && vite build`), `npm run lint` (oxlint), `npm test` (Vitest,
+`*.test.ts` next to the modules), `npm run preview`.
 
 ```
 src/
@@ -61,7 +108,8 @@ src/
   components/form/    form primitives (FormField, FormCard, TextInput, SegmentedControl, ChoiceCards)
   components/icons/   custom Lucide-style icons (clothing)
   components/scan/    ScanViewport (camera + states), BodyGuideOverlay (scan frame + one 3D
-                      reference mannequin), ScanStatus, ScanPhaseProgress
+                      reference mannequin), ScanStatus (+ capture progress), ScanPhaseProgress,
+                      PoseDebugOverlay / PoseDebugPanel (?poseDebug only)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
@@ -69,16 +117,22 @@ src/
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
-                      (user, fit, settings); only display units/theme are persisted
+                      (user, fit, settings); only display units/theme/voice preference are persisted
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
-                      useCamera, useFrameQuality, useScanSession)
+                      useCamera, useFrameQuality, useScanSession, usePoseScan, useVoiceGuidance,
+                      useMediaQuery, useScrollLock, useWakeLock)
   services/           side-effect/IO modules (safe localStorage wrapper, camera,
-                      frame analysis, body detection contract)
+                      frame analysis, pose/poseLandmarker = MediaPipe engine, speech)
   utils/              pure helpers: constants, motion presets, unit conversion,
                       user-info validation, clothing catalog + validation,
-                      scan phases + scan guidance
+                      scan phases + scan guidance, scanPreview, pose/ (landmarks, orientation,
+                      validation + capture hold, config, scanRegions = clothing → body region)
+  utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
+                      definitions (per-region measurements), measureScan; tests + testFixtures (tests only)
   types/domain.ts     domain types (lengths in cm, weight in kg)
-  types/scan.ts       scan/camera types
+  types/scan.ts       scan/camera types (ScanCapture = landmark snapshot)
+  types/pose.ts       pose landmark types
+  types/measurement.ts  measurement / calibration / report types
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 
@@ -99,6 +153,7 @@ Intended stack:
 - Custom CSS (no UI framework unless explicitly approved)
 - Lucide React (icons)
 - Three.js (only for the 3D reference mannequin on the Body Scan page; lazy-loaded)
+- @mediapipe/tasks-vision (on-device pose detection on the Body Scan page; lazy-loaded)
 
 If the repository already contains a working setup, use the existing project choices
 unless there is a strong technical reason to change them. Explain any such reason
