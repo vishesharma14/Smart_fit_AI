@@ -1,0 +1,45 @@
+import { create } from 'zustand';
+import type { TapeMeasurement, ValidationScanAttempt, ValidationSubject } from '../types/validation';
+
+/*
+ * Real-person validation records (Step 9E-3A, `?poseDebug` only). Kept in memory only — deliberately not part of
+ * the persisted app store, never written to storage and never uploaded; reloading the page clears them.
+ */
+
+interface ValidationState {
+  subjects: ValidationSubject[];
+  activeSubjectId: string | null;
+  /** Adds a subject, or replaces the height / ground truth of an existing one (keeping its attempts). */
+  saveSubject: (subject: { subjectId: string; heightCm: number; groundTruth: TapeMeasurement[] }) => void;
+  selectSubject: (subjectId: string | null) => void;
+  /** Adds an attempt to a subject; the attempt number must be new for that subject. */
+  addAttempt: (subjectId: string, attempt: ValidationScanAttempt) => boolean;
+  clearAll: () => void;
+}
+
+export const useValidationStore = create<ValidationState>()((set, get) => ({
+  subjects: [],
+  activeSubjectId: null,
+  saveSubject: ({ subjectId, heightCm, groundTruth }) =>
+    set((state) => {
+      const existing = state.subjects.find((s) => s.subjectId === subjectId);
+      const subjects = existing
+        ? state.subjects.map((s) => (s.subjectId === subjectId ? { ...s, heightCm, groundTruth } : s))
+        : [...state.subjects, { subjectId, heightCm, groundTruth, attempts: [], synthetic: false }];
+      return { subjects, activeSubjectId: subjectId };
+    }),
+  selectSubject: (subjectId) => set({ activeSubjectId: subjectId }),
+  addAttempt: (subjectId, attempt) => {
+    const subject = get().subjects.find((s) => s.subjectId === subjectId);
+    if (!subject || subject.attempts.some((a) => a.attempt === attempt.attempt)) return false;
+    set((state) => ({
+      subjects: state.subjects.map((s) => (s.subjectId === subjectId ? { ...s, attempts: [...s.attempts, attempt] } : s)),
+    }));
+    return true;
+  },
+  clearAll: () => set({ subjects: [], activeSubjectId: null }),
+}));
+
+/** Next attempt number for a subject (1 for the first scan). */
+export const nextAttemptNumber = (subject: ValidationSubject | undefined): number =>
+  subject ? Math.max(0, ...subject.attempts.map((a) => a.attempt)) + 1 : 1;
