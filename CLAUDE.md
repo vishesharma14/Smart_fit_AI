@@ -39,7 +39,7 @@ Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Informati
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
-no real-person data collected yet).
+no real-person data collected yet), 10 (rule-based size recommendation engine).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -146,7 +146,17 @@ reasons, fit/height error, worker time. Attempts also keep browser summary (`bro
 device details, Anny model-load/fit ms and `performance` (scan start→finish, first→last view, pose-model runs/s and
 ms/frame sampled by `useScanPerformance`, tester observations). Labels: "REAL-WORLD VALIDATION — EXPERIMENTAL",
 "These results do not yet establish production clothing-size accuracy." Anny's 2 cm gate and all engines unchanged.
-**No size prediction or size charts exist yet.**
+Size recommendation (Step 10, `utils/sizing/`, pure and unit-tested): `recommendSize({ garment, measurements, audience? })`
+→ `SizeRecommendation` (types in `types/sizing.ts`): size S–XXL, fit (Good Fit / Slightly Tight / Slightly Loose /
+No Suitable Size / Insufficient Data), measurements used, alternative size at a boundary, reason, chart name. Rule-based,
+deterministic — not machine learning. `sizeCharts.ts` holds generic adult body-measurement charts (contiguous S–XXL
+ranges, min inclusive / max exclusive; replaceable by brand charts): T-shirt chest; shirt and blazer chest + waist; jeans
+and trousers waist + hip. The primary measurement decides; the secondary sizes up when it needs a larger size; values
+within 3 cm outside the chart get the end size (tight/loose), further out = `outside-range`. Missing / invalid /
+unsupported / model-unit / implausible primary values → `insufficient-data` (never substituted); `uncertain` values are
+used but flagged; children's sizes → `unsupported`. `fromConfirmed.ts` `recommendForConfirmed` uses the confirmed
+measurements and the scanned garment (else the clothing selection); the Measurement Review page shows
+`components/sizing/SizeRecommendationCard` once measurements are confirmed (no separate results page yet).
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
@@ -181,6 +191,7 @@ src/
                       PoseDebugOverlay / PoseDebugPanel (?poseDebug only)
   components/scan/validation/  ValidationPanel (?poseDebug only, lazy): protocol, tape ground truth, scan records
                       (usable/unusable), metrics, repeatability, Anny reliability, export; useScanPerformance
+  components/sizing/  SizeRecommendationCard (shown on the review page after confirmation)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
@@ -212,6 +223,8 @@ src/
   utils/validation/   real-person validation (Steps 9E-3A/B): definitions (+ protocol), groundTruth, compare, metrics
                       (+ Anny reliability), repeatability, fromScan (+ usability), browser, export (+ privacy guard);
                       syntheticFixture (tests only)
+  utils/sizing/       size recommendation (Step 10): sizeCharts (generic charts + rules), recommendSize (engine),
+                      fromConfirmed (confirmed measurements → engine)
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),
@@ -223,6 +236,7 @@ src/
   types/measurement.ts  measurement / calibration / report types
   types/silhouette.ts   body-outline profile types (numbers only, never the mask)
   types/validation.ts   validation subject / tape measurement / scan attempt types (numbers and labels only)
+  types/sizing.ts       size chart / size recommendation types
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 
