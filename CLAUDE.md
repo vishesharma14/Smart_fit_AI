@@ -40,7 +40,7 @@ clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement eng
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
 no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
-Welcome-page profile link, wording review), 13 (personalized fit preference).
+Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -184,6 +184,16 @@ other measurement fits it; Relaxed → larger size if in the top `edgeBandFracti
 `preferenceAdjustment`; insufficient-data / outside-range are unaffected. `fitPreferenceFor` (fromConfirmed) uses the
 selection's fit only for the matching garment. Results/Profile show "Your preference"; `FitProfile.fitPreference` is
 saved, and `normalizeFitProfile` loads older profiles without it as Regular.
+Scan quality (Step 14, `utils/scanQuality/scanQuality.ts`, types `types/scanQuality.ts`): `calculateScanQuality({ captures,
+report, userHeightCm })` → `{ score 0–100, level, factors, recommendations, cappedBecause }`, deterministic, from existing
+per-capture signals only: visibility (key-joint landmark visibility, best side per pair; ×0.5 if the outline is
+head/floor-clipped), stability (outline `widthJitter` → 1 − jitter / `maxWidthJitter`), coverage (0.8 × main views + 0.2
+× angled views), outline (share with an outline × median edge sharpness), calibration (report calibration confidence +
+per-capture `silhouetteScale` confidence). Weights 20/15/25/25/15; null factors are dropped and weights renormalised;
+missing a main view caps the score at 74 (Fair). Levels ≥90 / ≥75 / ≥60. Lighting is not stored per capture, so not
+scored. Computed in BodyScanPage's "Review measurements" and kept on `ScanMeasurementResult.scanQuality` (memory only,
+never on the profile). Shown by `components/scanQuality/ScanQualityCard` on the review page and as a one-line
+"Scan quality" note in the Results hero. Never changes measurements, sizing or the confirm/edit rules.
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
@@ -221,6 +231,7 @@ src/
                       (usable/unusable), metrics, repeatability, Anny reliability, export; useScanPerformance
   components/sizing/  SizeRecommendationCard (shown on the review page after confirmation)
   components/results/ SizeHero, MeasurementList, results.css (Results + Profile pages)
+  components/scanQuality/  ScanQualityCard (review page)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), React wrapper (statically imported)
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
@@ -256,6 +267,7 @@ src/
   utils/sizing/       size recommendation (Step 10): sizeCharts (generic charts + rules), recommendSize (engine),
                       fromConfirmed (confirmed measurements → engine)
   utils/profile/      fit profile (Step 11): fitProfile (build, history, storage guards), format (dates, scan path)
+  utils/scanQuality/  scan quality score (Step 14): calculateScanQuality, levels, weights
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),
@@ -269,6 +281,7 @@ src/
   types/validation.ts   validation subject / tape measurement / scan attempt types (numbers and labels only)
   types/sizing.ts       size chart / size recommendation types
   types/profile.ts      saved fit profile / scan history types
+  types/scanQuality.ts  scan quality result types
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 

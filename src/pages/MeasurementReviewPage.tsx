@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, CircleCheck, Info, PencilLine, ScanLine, 
 import { useLocation } from 'react-router';
 import { Button } from '../components/Button';
 import { FormCard } from '../components/form/FormCard';
+import { ScanQualityCard } from '../components/scanQuality/ScanQualityCard';
 import { SizeRecommendationCard } from '../components/sizing/SizeRecommendationCard';
 import { FormField } from '../components/form/FormField';
 import { TextInput } from '../components/form/TextInput';
@@ -162,6 +163,8 @@ function Review({ result, confirmed, onConfirm, recommend }: ReviewProps) {
           </p>
         ))}
       </motion.div>
+
+      {result.scanQuality && <ScanQualityCard quality={result.scanQuality} />}
 
       <FormCard
         titleId="measurements-list-title"

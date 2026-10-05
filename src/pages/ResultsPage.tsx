@@ -9,12 +9,14 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { FlowStepLayout } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
 import { useAppStore } from '../store/useAppStore';
+import type { ScanQuality } from '../types/scanQuality';
 import type { SizeRecommendation } from '../types/sizing';
 import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { buildFitProfile, isSavedFrom } from '../utils/profile/fitProfile';
 import { startScanPath } from '../utils/profile/format';
+import { LEVEL_LABELS } from '../utils/scanQuality/scanQuality';
 import { recommendForConfirmed } from '../utils/sizing/fromConfirmed';
 
 const TITLE_ID = 'results-title';
@@ -66,6 +68,7 @@ export function ResultsPage() {
             saved={isSavedFrom(fitProfile, confirmed, recommendation)}
             hasProfileForScan={fitProfile?.measuredAt === confirmed.measuredAt && fitProfile.garment === recommendation.garment}
             confidenceOf={(id) => confirmed.measurements.find((m) => m.id === id)?.confidence ?? null}
+            scanQuality={scanResult?.measuredAt === confirmed.measuredAt ? (scanResult.scanQuality ?? null) : null}
             onSave={() => {
               const profile = buildFitProfile(confirmed, recommendation);
               if (profile) saveFitProfile(profile);
@@ -107,11 +110,13 @@ interface ResultProps {
   saved: boolean;
   hasProfileForScan: boolean;
   confidenceOf: (id: string) => number | null;
+  /** Quality of the scan these measurements came from (Step 14), shown as a small secondary note. */
+  scanQuality: ScanQuality | null;
   onSave: () => void;
   onEdit: () => void;
 }
 
-function Result({ recommendation, saved, hasProfileForScan, confidenceOf, onSave, onEdit }: ResultProps) {
+function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQuality, onSave, onEdit }: ResultProps) {
   const { status, size, fit, alternativeSize, basedOnUncertain, garment, reason, chartName, measurementsUsed, fitPreference } = recommendation;
   const recommended = status === 'recommended' && size !== null;
   const saveLabel = saved ? 'Saved to Profile' : hasProfileForScan ? 'Update Fit Profile' : 'Save Fit Profile';
@@ -128,7 +133,13 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, onSave
         basedOnUncertain={basedOnUncertain}
         fitPreference={fitPreference}
         emptyTitle={status === 'recommended' ? undefined : EMPTY_TITLES[status]}
-      />
+      >
+        {scanQuality && (
+          <p className="result-hero__quality" data-level={scanQuality.level}>
+            Scan quality: {LEVEL_LABELS[scanQuality.level]} · {scanQuality.score}/100
+          </p>
+        )}
+      </SizeHero>
 
       <motion.section className="result-card" aria-labelledby="results-why-title" variants={fadeUpItem}>
         <h2 id="results-why-title" className="result-card__title">

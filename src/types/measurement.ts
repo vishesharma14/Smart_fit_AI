@@ -1,3 +1,4 @@
+import type { ScanQuality } from './scanQuality';
 import type { ClothingType } from './domain';
 import type { ScanViewId } from './scan';
 
@@ -110,6 +111,8 @@ export interface ScanMeasurementResult {
   clothingType: ClothingType | null;
   /** ISO 8601 time the measurements were computed. */
   measuredAt: string;
+  /** Informational quality of the scan data (Step 14); absent for results created without the scan. */
+  scanQuality?: ScanQuality;
 }
 
 /** The measurements the user reviewed and confirmed (input for size prediction in a later step). */

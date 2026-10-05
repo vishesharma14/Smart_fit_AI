@@ -53,6 +53,24 @@ oxlint.
   marked **uncertain**, because they have not yet been validated against tape measurements of real people.
   Missing evidence makes a measurement unavailable — values are never guessed.
 
+## Scan quality score
+
+After a scan, the Measurement Review page shows an informational **Scan Quality** score (0–100; Excellent ≥ 90,
+Good ≥ 75, Fair ≥ 60, else Poor) with its factors and tips for the weak ones. It is computed on the device from
+signals the scan already records for each captured view — no extra model:
+
+- **Body visibility**: the pose model's visibility of shoulders, hips, knees and ankles; lower when the outline is cut
+  off at the head or feet.
+- **Pose stability**: how steady the body outline stayed over each capture hold.
+- **View coverage**: the four main views and the four angled views.
+- **Outline quality**: share of views with a usable outline and its edge sharpness.
+- **Scale calibration**: how reliably the views could be scaled with the entered height (it cannot tell whether the
+  entered height itself is right).
+
+Weights are 20 / 15 / 25 / 25 / 15 %; factors without data are left out. A scan missing one of the four main views is
+capped at Fair. Lighting is checked live before each capture but not recorded, so it is not scored. The score never
+changes the measurements or the size, and it is kept only for the current session.
+
 ## Size recommendation
 
 `recommendSize({ garment, measurements })` is a small, deterministic, rule-based function (no machine learning):
