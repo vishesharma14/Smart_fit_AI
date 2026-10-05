@@ -43,7 +43,7 @@ describe('navigation', () => {
   it('shows My Fit Profile on the welcome page once a profile is saved', async () => {
     useAppStore.setState({
       fitProfile: {
-        id: 'a|t-shirt', garment: 't-shirt', size: 'M', fit: 'good-fit', measuredAt: '2026-01-01T00:00:00.000Z',
+        id: 'a|t-shirt', garment: 't-shirt', size: 'M', fit: 'good-fit', fitPreference: 'regular', measuredAt: '2026-01-01T00:00:00.000Z',
         savedAt: '2026-01-01T00:01:00.000Z', alternativeSize: null, basedOnUncertain: false, chartName: 'chart',
         confirmedAt: '2026-01-01T00:00:30.000Z', measurements: [],
       },

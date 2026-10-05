@@ -6,7 +6,7 @@ import { createSettingsSlice } from './slices/settingsSlice';
 import { createUserSlice } from './slices/userSlice';
 import type { ThemePreference } from '../types/domain';
 import type { AppState } from './types';
-import { isFitProfile, isScanRecord } from '../utils/profile/fitProfile';
+import { isScanRecord, normalizeFitProfile } from '../utils/profile/fitProfile';
 
 /**
  * Global application store, composed from feature slices.
@@ -41,7 +41,7 @@ export const useAppStore = create<AppState>()(
         return {
           ...current,
           ...stored,
-          fitProfile: isFitProfile(stored.fitProfile) ? stored.fitProfile : null,
+          fitProfile: normalizeFitProfile(stored.fitProfile),
           scanHistory: Array.isArray(stored.scanHistory) ? stored.scanHistory.filter(isScanRecord) : [],
         };
       },

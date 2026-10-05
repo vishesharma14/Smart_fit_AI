@@ -1,4 +1,4 @@
-import type { ClothingType } from './domain';
+import type { ClothingType, FitPreference } from './domain';
 import type { MeasurementId, MeasurementStatus, MeasurementUnit } from './measurement';
 
 /*
@@ -80,4 +80,11 @@ export interface SizeRecommendation {
   reason: string;
   /** Chart that was applied (null when none). */
   chartName: string | null;
+  /** The user's fit preference the result was computed for. */
+  fitPreference: FitPreference;
+  /**
+   * Set when the preference moved the size to the neighbouring one (`from` = the size the measurements fall in);
+   * null when the preference did not change the size.
+   */
+  preferenceAdjustment: { from: SizeLabel; to: SizeLabel } | null;
 }

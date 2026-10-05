@@ -372,3 +372,20 @@
   border-color: var(--color-danger);
   color: var(--color-danger);
 }
+
+/* Fit preference under the garment name (Step 13) */
+.result-hero__preference {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.result-hero__preference-label {
+  margin-right: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}

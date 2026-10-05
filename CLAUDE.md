@@ -40,7 +40,7 @@ clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement eng
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
 no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
-Welcome-page profile link, wording review).
+Welcome-page profile link, wording review), 13 (personalized fit preference).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -175,6 +175,15 @@ dates, saved measurements, previous results, Scan Again, View latest results, De
 with Start a scan (details page until a height is entered). `fitProfile` and `scanHistory` are persisted with the
 display preferences in browser storage on this device only (numbers only; validated on load by `isFitProfile` /
 `isScanRecord`; deletable). `FlowStepLayout` takes an optional `step` (none → `topbarExtra`).
+Fit preference (Step 13): `FitPreference` = 'slim' | 'regular' | 'relaxed' (`types/domain.ts`), chosen on the Clothing
+Selection page ("How do you like your clothes to fit?", `FIT_DEFINITIONS`; Regular preselected via `defaultFitFor`;
+trousers/blazers offer Slim/Regular only) and kept in `clothingSelection.fit` (memory, survives Scan Again).
+`recommendSize({ …, fitPreference })` (default Regular = unchanged behaviour) only moves between neighbouring sizes when
+the deciding measurement allows it: Slim → smaller size if within `SIZING_RULES.slimReachCm` (1 cm) above it and the
+other measurement fits it; Relaxed → larger size if in the top `edgeBandFraction` band. Result carries `fitPreference` +
+`preferenceAdjustment`; insufficient-data / outside-range are unaffected. `fitPreferenceFor` (fromConfirmed) uses the
+selection's fit only for the matching garment. Results/Profile show "Your preference"; `FitProfile.fitPreference` is
+saved, and `normalizeFitProfile` loads older profiles without it as Regular.
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's

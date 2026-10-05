@@ -129,8 +129,8 @@ export function ClothingSelectionPage() {
             <FormCard
               key="fit"
               titleId="clothing-fit-title"
-              title="Preferred fit"
-              subtitle="Fit preference shapes the style of your recommendation, from close-fitting to roomy. It does not change your measurements."
+              title="How do you like your clothes to fit?"
+              subtitle="Your preference decides between neighbouring sizes when your measurements are close to a size boundary. It does not change your measurements."
             >
               <FormField
                 label={`Fit for ${selectedItem.label.toLowerCase()}`}

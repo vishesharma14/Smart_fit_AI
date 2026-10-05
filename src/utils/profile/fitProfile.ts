@@ -1,6 +1,7 @@
 import type { ConfirmedMeasurements } from '../../types/measurement';
 import type { FitProfile, SavedMeasurement, ScanRecord } from '../../types/profile';
 import { SIZE_LABELS, type SizeRecommendation } from '../../types/sizing';
+import { DEFAULT_FIT_PREFERENCE, isFitPreference } from '../clothingCatalog';
 
 /*
  * Builds the saved fit profile from the confirmed measurements and their size recommendation (Step 11).
@@ -33,6 +34,7 @@ export function buildFitProfile(
     garment: recommendation.garment,
     size: recommendation.size,
     fit: recommendation.fit,
+    fitPreference: recommendation.fitPreference,
     alternativeSize: recommendation.alternativeSize,
     basedOnUncertain: recommendation.basedOnUncertain,
     chartName: recommendation.chartName ?? '',
@@ -61,7 +63,8 @@ export function isSavedFrom(profile: FitProfile | null, confirmed: ConfirmedMeas
       profile.measuredAt === confirmed.measuredAt &&
       profile.confirmedAt === confirmed.confirmedAt &&
       profile.garment === recommendation.garment &&
-      profile.size === recommendation.size,
+      profile.size === recommendation.size &&
+      profile.fitPreference === recommendation.fitPreference,
   );
 }
 
@@ -75,6 +78,17 @@ export function isScanRecord(value: unknown): value is ScanRecord {
   return isString(r.id) && isString(r.garment) && isSize(r.size) && isString(r.fit) && isString(r.measuredAt) && isString(r.savedAt);
 }
 
+/**
+ * A stored profile as the app uses it: a missing or unknown fit preference (profiles saved before fit preferences
+ * existed) becomes Regular. Returns null for anything that is not a valid profile.
+ */
+export function normalizeFitProfile(value: unknown): FitProfile | null {
+  if (!isFitProfile(value)) return null;
+  const stored = (value as { fitPreference?: unknown }).fitPreference;
+  return { ...value, fitPreference: isFitPreference(stored) ? stored : DEFAULT_FIT_PREFERENCE };
+}
+
+/** Structure check for stored profiles (the fit preference is optional here; see `normalizeFitProfile`). */
 export function isFitProfile(value: unknown): value is FitProfile {
   if (!isScanRecord(value)) return false;
   const p = value as unknown as Record<string, unknown>;

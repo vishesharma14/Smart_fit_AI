@@ -64,6 +64,11 @@ oxlint.
   garment fits in both places.
 - Fit status comes from where the measurement sits within the size's range; a neighbouring size is suggested at a
   boundary.
+- **Fit preference** (Slim / Regular / Relaxed, chosen with the garment; Regular by default) only decides between
+  neighbouring sizes, and only where the measurements allow it: Slim takes the smaller size when the deciding
+  measurement is less than 1 cm above it (and the other measurement fits it too); Relaxed takes the larger size when
+  the measurement is in the top 20% of its size. Regular is the plain chart comparison. The preference never changes
+  the measurements, an Insufficient Data result or a "no suitable size" result.
 - If a required measurement is missing, invalid or implausible, the result is **Insufficient Data** — no size is
   shown. Uncertain measurements are used but flagged.
 
@@ -131,8 +136,8 @@ secrets are needed.
   Loose clothing makes the outline larger than the body.
 - Size charts are generic; real brands differ. Treat the result as an assistive recommendation and check the brand's
   own chart.
-- Only adult sizes (S–XXL); children's sizes are not supported. Fit preference (slim / regular / relaxed) does not yet
-  change the recommended size, and inseam does not produce a length size.
+- Only adult sizes (S–XXL); children's sizes are not supported, and inseam does not produce a length size. Tailored
+  trousers and blazers offer Slim and Regular fit only.
 - The fit profile is stored only in this browser on this device.
 
 ## Future improvements
@@ -140,4 +145,3 @@ secrets are needed.
 - Real brand size charts (and length sizes such as inseam).
 - Larger real-person validation of the measurements against tape measurements.
 - Improved body-model fitting for circumferences.
-- Using the clothing-fit preference in the recommendation.
