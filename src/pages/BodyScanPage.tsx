@@ -40,6 +40,7 @@ import { useAppStore } from '../store/useAppStore';
 import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { measureCompletedScan } from '../utils/measurement/fromScan';
+import { calculateScanQuality } from '../utils/scanQuality/scanQuality';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { SCAN_FRAMING_REGION } from '../utils/pose/scanRegions';
 import { deriveScanGuidance } from '../utils/scanGuidance';
@@ -218,7 +219,10 @@ export function BodyScanPage() {
   const userHeightCm = useAppStore((s) => s.userInfo.heightCm);
   const setScanMeasurements = useAppStore((s) => s.setScanMeasurements);
   const reviewMeasurements = () => {
-    setScanMeasurements(measureCompletedScan({ captures: session.captures, clothingType: clothing?.type, userHeightCm }));
+    const result = measureCompletedScan({ captures: session.captures, clothingType: clothing?.type, userHeightCm });
+    // Informational only: computed from the same captures, it never changes the measurements.
+    const scanQuality = calculateScanQuality({ captures: session.captures, report: result.report, userHeightCm });
+    setScanMeasurements({ ...result, scanQuality });
     navigate(PATHS.measurements);
   };
 
