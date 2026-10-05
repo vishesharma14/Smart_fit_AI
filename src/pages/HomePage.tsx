@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Shirt, Sparkles } from 'lucide-react';
+import { ArrowRight, Shirt, Sparkles, UserRound } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { Button } from '../components/Button';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
-import { WELCOME_NEXT_PATH } from '../routes/paths';
+import { PATHS, WELCOME_NEXT_PATH } from '../routes/paths';
+import { useAppStore } from '../store/useAppStore';
 import { APP_DESCRIPTION, pageTitle } from '../utils/constants';
 import { EASE_OUT, fadeUpItem as item, staggerContainer as container } from '../utils/motion';
 import './HomePage.css';
@@ -13,6 +14,7 @@ const START_UNAVAILABLE_NOTE_ID = 'start-unavailable-note';
 /** Welcome page: brand introduction and entry point into the SizerAI flow. */
 export function HomePage() {
   useDocumentTitle(pageTitle());
+  const hasSavedProfile = useAppStore((s) => s.fitProfile !== null);
 
   return (
     <div className="welcome">
@@ -24,7 +26,7 @@ export function HomePage() {
         <motion.div className="welcome__copy" variants={container} initial="hidden" animate="visible">
           <motion.p className="welcome__eyebrow" variants={item}>
             <Sparkles aria-hidden="true" size={16} strokeWidth={2} />
-            AI-powered size guidance
+            On-device AI body scan
           </motion.p>
 
           <motion.h1 id="welcome-title" className="welcome__title" variants={item}>
@@ -38,10 +40,18 @@ export function HomePage() {
 
           <motion.div className="welcome__actions" variants={item}>
             {WELCOME_NEXT_PATH ? (
-              <Button to={WELCOME_NEXT_PATH} size="lg">
-                Get Started
-                <ArrowRight aria-hidden="true" size={20} />
-              </Button>
+              <>
+                <Button to={WELCOME_NEXT_PATH} size="lg">
+                  Get Started
+                  <ArrowRight aria-hidden="true" size={20} />
+                </Button>
+                {hasSavedProfile && (
+                  <Button to={PATHS.profile} variant="secondary" size="lg">
+                    <UserRound aria-hidden="true" size={20} />
+                    My Fit Profile
+                  </Button>
+                )}
+              </>
             ) : (
               <>
                 <Button size="lg" aria-disabled="true" aria-describedby={START_UNAVAILABLE_NOTE_ID}>

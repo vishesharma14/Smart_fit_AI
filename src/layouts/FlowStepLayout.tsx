@@ -11,8 +11,11 @@ import './FlowStepLayout.css';
 export const FLOW_TOTAL_STEPS = 4;
 
 interface FlowStepLayoutProps {
-  step: number;
-  stepLabel: string;
+  /** Fit-flow step (shows the progress bar); omitted for pages after the flow, e.g. Results and Profile. */
+  step?: number;
+  stepLabel?: string;
+  /** Extra content on the right of the top bar when there is no step progress (e.g. a Profile link). */
+  topbarExtra?: ReactNode;
   /** id of the page <h1>; also used to label the step's form. */
   titleId: string;
   title: ReactNode;
@@ -27,7 +30,7 @@ interface FlowStepLayoutProps {
  * Shared frame for fit-flow steps: brand + progress bar, then an intro column
  * beside the step's form on desktop (stacked on smaller screens).
  */
-export function FlowStepLayout({ step, stepLabel, titleId, title, lead, introExtra, children }: FlowStepLayoutProps) {
+export function FlowStepLayout({ step, stepLabel, topbarExtra, titleId, title, lead, introExtra, children }: FlowStepLayoutProps) {
   return (
     <div className="flow-step">
       <motion.div
@@ -37,7 +40,7 @@ export function FlowStepLayout({ step, stepLabel, titleId, title, lead, introExt
         transition={{ duration: 0.5 }}
       >
         <BrandLogo />
-        <StepProgress current={step} total={FLOW_TOTAL_STEPS} label={stepLabel} />
+        {step !== undefined ? <StepProgress current={step} total={FLOW_TOTAL_STEPS} label={stepLabel ?? ''} /> : topbarExtra}
       </motion.div>
 
       <div className="flow-step__layout">

@@ -1,0 +1,120 @@
+.size-rec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-glass);
+}
+
+.size-rec__title {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.size-rec__result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.size-rec__size {
+  margin: 0;
+  min-width: 4.5rem;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgb(139 92 246 / 0.25), rgb(34 211 238 / 0.18));
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.size-rec__fit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.size-rec__fit-pill,
+.size-rec__alt {
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.size-rec__fit-pill {
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.size-rec__fit-pill[data-fit='good-fit'] {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.size-rec__fit-pill[data-fit='slightly-tight'],
+.size-rec__fit-pill[data-fit='slightly-loose'] {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.size-rec__fit-pill[data-fit='no-size'],
+.size-rec__fit-pill[data-fit='insufficient-data'] {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.size-rec__alt {
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+
+.size-rec__unavailable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.size-rec__reason {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.size-rec__used {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.size-rec__used div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.size-rec__used dt {
+  color: var(--color-text-muted);
+}
+
+.size-rec__used dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.size-rec__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+}

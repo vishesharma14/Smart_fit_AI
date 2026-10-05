@@ -242,3 +242,12 @@
     order: -1;
   }
 }
+
+/* Link to the Results page once confirmed (Step 11) */
+.measure-review__results-link {
+  display: flex;
+}
+
+.measure-review__results-link .button {
+  flex: 1;
+}

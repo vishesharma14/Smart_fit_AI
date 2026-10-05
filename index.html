@@ -6,6 +6,9 @@
     <meta name="description" content="SizerAI helps you find the right clothing size. Perfect Fit. Powered by AI." />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#070a14" />
+    <!-- Network requests may only go to this app's own origin. Keeps scan processing on the device and blocks the
+         usage-statistics logging built into the MediaPipe library (it has no opt-out setting). -->
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'self' blob: data:" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>SizerAI — Perfect Fit. Powered by AI.</title>
   </head>

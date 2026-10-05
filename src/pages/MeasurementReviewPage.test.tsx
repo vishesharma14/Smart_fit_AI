@@ -7,6 +7,7 @@ import { useAppStore } from '../store/useAppStore';
 import type { ScanMeasurementResult } from '../types/measurement';
 import { measureScan } from '../utils/measurement/measureScan';
 import { makeCaptures, makeSilhouetteCaptures } from '../utils/measurement/testFixtures';
+import { BODY } from '../utils/silhouette/testBody';
 import { MeasurementReviewPage } from './MeasurementReviewPage';
 
 // Real Step 7 engine output from synthetic captures of known geometry (tests only).
@@ -43,7 +44,7 @@ function renderReview() {
 const item = (name: string) => screen.getByRole('listitem', { name });
 
 beforeEach(() => {
-  useAppStore.setState({ scanMeasurements: null, measurements: null });
+  useAppStore.setState({ scanMeasurements: null, measurements: null, clothingSelection: null });
 });
 afterEach(cleanup);
 
@@ -223,5 +224,36 @@ describe('scan measurement state', () => {
     });
     useAppStore.getState().setScanMeasurements(scanResult(null));
     expect(useAppStore.getState().measurements).toBeNull();
+  });
+
+  it('shows a rule-based size recommendation for the confirmed measurements', () => {
+    // Synthetic engine output (tests only): chest edited to a known tape value so the expected size is known.
+    useAppStore.setState({ clothingSelection: { type: 't-shirt', fit: 'regular' } });
+    useAppStore.getState().setScanMeasurements({
+      report: measureScan({ captures: makeSilhouetteCaptures(), region: 'upper', userHeightCm: BODY.statureCm }),
+      clothingType: 't-shirt',
+      measuredAt: '2026-01-01T00:00:09.000Z',
+    });
+    renderReview();
+    expect(screen.queryByRole('heading', { name: /Size recommendation/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Measurements' }));
+    fireEvent.change(within(item('Chest')).getByRole('textbox'), { target: { value: '98' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Measurements' }));
+
+    const card = screen.getByRole('region', { name: /Size recommendation · T-Shirt/ });
+    expect(within(card).getByLabelText('Recommended size M')).toBeTruthy();
+    expect(within(card).getByText('Good Fit')).toBeTruthy();
+    expect(within(card).getByText(/not a machine-learning prediction/)).toBeTruthy();
+    expect(within(card).getByText(/98 cm \(edited by you\) → M/)).toBeTruthy();
+  });
+
+  it('shows insufficient data instead of a size when no garment is known', () => {
+    useAppStore.getState().setScanMeasurements(scanResult(170));
+    renderReview();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Measurements' }));
+    const card = screen.getByRole('region', { name: /Size recommendation/ });
+    expect(within(card).queryByLabelText(/Recommended size/)).toBeNull();
+    expect(within(card).getByText(/No recommendation available/)).toBeTruthy();
   });
 });

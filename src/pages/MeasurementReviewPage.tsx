@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, CircleCheck, Info, PencilLine, ScanLine, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CircleCheck, Info, PencilLine, ScanLine, X } from 'lucide-react';
+import { useLocation } from 'react-router';
 import { Button } from '../components/Button';
 import { FormCard } from '../components/form/FormCard';
+import { SizeRecommendationCard } from '../components/sizing/SizeRecommendationCard';
 import { FormField } from '../components/form/FormField';
 import { TextInput } from '../components/form/TextInput';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -10,6 +12,7 @@ import { FlowStepForm, FlowStepLayout } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
 import { useAppStore } from '../store/useAppStore';
 import type { ConfirmedMeasurements, ReviewedMeasurement, ScanMeasurementResult } from '../types/measurement';
+import type { SizeRecommendation } from '../types/sizing';
 import { getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import {
@@ -23,6 +26,7 @@ import {
   type DraftValues,
 } from '../utils/measurement/review';
 import { fadeUpItem } from '../utils/motion';
+import { recommendForConfirmed } from '../utils/sizing/fromConfirmed';
 import './MeasurementReviewPage.css';
 
 const TITLE_ID = 'measurements-title';
@@ -34,6 +38,8 @@ export function MeasurementReviewPage() {
   const result = useAppStore((s) => s.scanMeasurements);
   const confirmed = useAppStore((s) => s.measurements);
   const setMeasurements = useAppStore((s) => s.setMeasurements);
+  const clothingSelection = useAppStore((s) => s.clothingSelection);
+  const gender = useAppStore((s) => s.userInfo.gender);
 
   return (
     <FlowStepLayout
@@ -61,7 +67,13 @@ export function MeasurementReviewPage() {
     >
       {result ? (
         // A new scan result starts a fresh review.
-        <Review key={result.measuredAt} result={result} confirmed={confirmed} onConfirm={setMeasurements} />
+        <Review
+          key={result.measuredAt}
+          result={result}
+          confirmed={confirmed}
+          onConfirm={setMeasurements}
+          recommend={(measurements) => recommendForConfirmed(measurements, clothingSelection, gender)}
+        />
       ) : (
         <NoResults />
       )}
@@ -89,12 +101,18 @@ interface ReviewProps {
   result: ScanMeasurementResult;
   confirmed: ConfirmedMeasurements | null;
   onConfirm: (measurements: ConfirmedMeasurements) => void;
+  /** Size recommendation for the confirmed measurements (rule-based engine, Step 10). */
+  recommend: (measurements: ConfirmedMeasurements) => SizeRecommendation;
 }
 
-function Review({ result, confirmed, onConfirm }: ReviewProps) {
+function Review({ result, confirmed, onConfirm, recommend }: ReviewProps) {
+  // "Edit Measurements" on the Results page opens this page straight in edit mode.
+  const openInEditMode = (useLocation().state as { edit?: boolean } | null)?.edit === true;
   const [measurements, setReviewed] = useState(() => initialReview(result, confirmed));
-  const [editing, setEditing] = useState(false);
-  const [drafts, setDrafts] = useState<DraftValues>({});
+  const [editing, setEditing] = useState(() => openInEditMode && measurements.some(isEditable));
+  const [drafts, setDrafts] = useState<DraftValues>(() =>
+    editing ? Object.fromEntries(measurements.filter(isEditable).map((m) => [m.id, draftFor(m)])) : {},
+  );
   const [errors, setErrors] = useState<Partial<Record<ReviewedMeasurement['id'], string>>>({});
 
   const anyEditable = measurements.some(isEditable);
@@ -181,10 +199,19 @@ function Review({ result, confirmed, onConfirm }: ReviewProps) {
           >
             <CircleCheck aria-hidden="true" size={20} strokeWidth={2} />
             <span>
-              <strong>Measurements confirmed.</strong> They are kept in memory on this device for this session. Size
-              recommendation is the next step and is not available yet.
+              <strong>Measurements confirmed.</strong> They are kept in memory on this device for this session (unless
+              you save them to your fit profile). Your size recommendation is shown below.
             </span>
           </motion.p>
+        )}
+        {isConfirmed && !editing && confirmed && <SizeRecommendationCard key="size" recommendation={recommend(confirmed)} />}
+        {isConfirmed && !editing && (
+          <motion.div key="results-link" className="measure-review__results-link" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Button to={PATHS.results} size="lg">
+              View Results
+              <ArrowRight aria-hidden="true" size={20} />
+            </Button>
+          </motion.div>
         )}
       </AnimatePresence>
 
