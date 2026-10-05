@@ -40,7 +40,7 @@ clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement eng
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
 no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
-Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score).
+Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -194,6 +194,17 @@ missing a main view caps the score at 74 (Fair). Levels ≥90 / ≥75 / ≥60. L
 scored. Computed in BodyScanPage's "Review measurements" and kept on `ScanMeasurementResult.scanQuality` (memory only,
 never on the profile). Shown by `components/scanQuality/ScanQualityCard` on the review page and as a one-line
 "Scan quality" note in the Results hero. Never changes measurements, sizing or the confirm/edit rules.
+Reference brand sizing (Step 15, `utils/sizing/brandCharts.ts` + `recommendBrandSize.ts`): `SizingBrandId` = 'generic' |
+'nike' | 'levis' | 'hm'; `BrandSizeChart { brandId, brandName, charts (partial per garment), sourceNote }` — hand-entered
+reference letter-size charts, not official data, no API/scraping (`REFERENCE_CHART_DISCLAIMER`, `REFERENCE_SIZING_NOTE`).
+`recommendBrandSize({ brand, garment, measurements, fitPreference })` → `BrandSizeRecommendation` (SizeRecommendation +
+brand, brandName, chartAvailable): Generic = `recommendSize` exactly; a brand runs the same engine (`charts` param, same
+fit-preference rules) on its chart; no chart for the garment → `unsupported`, no size, reason "Reference chart
+unavailable…" (never falls back to generic). Coverage: Nike t-shirt/trousers; Levi's t-shirt/shirt/jeans/trousers; H&M all.
+`recommendBrandForConfirmed` (fromConfirmed) feeds the Results page; the choice is `sizingBrand` in the user slice (memory,
+default Generic) via a "Brand" card (`SegmentedControl` `segmented--block`). The review-page card stays generic.
+`FitProfile.brand` is saved (`normalizeFitProfile` → 'generic' for older profiles; `isSavedFrom` compares it); SizeHero
+shows a "Brand" line (`brandName` prop) and `fitLabel` override. Scan history is unchanged.
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
@@ -265,7 +276,7 @@ src/
                       (+ Anny reliability), repeatability, fromScan (+ usability), browser, export (+ privacy guard);
                       syntheticFixture (tests only)
   utils/sizing/       size recommendation (Step 10): sizeCharts (generic charts + rules), recommendSize (engine),
-                      fromConfirmed (confirmed measurements → engine)
+                      fromConfirmed (confirmed measurements → engine); brandCharts + recommendBrandSize (Step 15)
   utils/profile/      fit profile (Step 11): fitProfile (build, history, storage guards), format (dates, scan path)
   utils/scanQuality/  scan quality score (Step 14): calculateScanQuality, levels, weights
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)

@@ -93,6 +93,19 @@ changes the measurements or the size, and it is kept only for the current sessio
 The charts are **generic adult reference ranges, not any brand's chart**, kept in one module so real brand charts can
 replace them.
 
+### Reference brand sizing
+
+On the Results page, **Brand → "Use reference brand sizing"** offers Generic (default — the chart above, unchanged),
+Nike, Levi's and H&M. `recommendBrandSize({ brand, garment, measurements, fitPreference })` applies the same rules and
+the same fit-preference logic to that brand's chart (`src/utils/sizing/brandCharts.ts`).
+
+- The brand charts are **small hand-entered reference datasets**, not official brand data and **not live brand APIs**:
+  nothing is scraped or fetched. *Reference size chart — actual sizing may vary by product and region.*
+- Only garments with a reference chart are covered (Nike: T-shirts and trousers; Levi's: T-shirts, shirts, jeans and
+  trousers; H&M: all five). For any other brand + garment the result is **Reference chart unavailable** — no size, and
+  the generic chart is never substituted.
+- A saved fit profile remembers which chart its size came from (older profiles load as Generic).
+
 ## Privacy
 
 - Camera frames, photos, video and segmentation masks are processed in the browser and are **not uploaded or
@@ -152,14 +165,14 @@ secrets are needed.
   Outline-based circumferences and inseam have not yet been validated against real-person tape measurements.
 - Accuracy depends on fitted clothing, good lighting, the full body being visible and an accurately entered height.
   Loose clothing makes the outline larger than the body.
-- Size charts are generic; real brands differ. Treat the result as an assistive recommendation and check the brand's
-  own chart.
+- Size charts are generic or hand-entered brand references; real brand sizing differs by product line, cut and
+  region. Treat the result as an assistive recommendation and check the brand's own chart.
 - Only adult sizes (S–XXL); children's sizes are not supported, and inseam does not produce a length size. Tailored
   trousers and blazers offer Slim and Regular fit only.
 - The fit profile is stored only in this browser on this device.
 
 ## Future improvements
 
-- Real brand size charts (and length sizes such as inseam).
+- Official, maintained brand size charts (and length sizes such as inseam).
 - Larger real-person validation of the measurements against tape measurements.
 - Improved body-model fitting for circumferences.

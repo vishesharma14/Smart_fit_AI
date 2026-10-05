@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Bookmark, CircleCheck, PencilLine, ScanLine, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/Button';
+import { SegmentedControl } from '../components/form/SegmentedControl';
 import { MeasurementList } from '../components/results/MeasurementList';
 import { SizeHero } from '../components/results/SizeHero';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -10,14 +11,16 @@ import { FlowStepLayout } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
 import { useAppStore } from '../store/useAppStore';
 import type { ScanQuality } from '../types/scanQuality';
-import type { SizeRecommendation } from '../types/sizing';
+import type { BrandSizeRecommendation, SizeRecommendation, SizingBrandId } from '../types/sizing';
 import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { buildFitProfile, isSavedFrom } from '../utils/profile/fitProfile';
 import { startScanPath } from '../utils/profile/format';
 import { LEVEL_LABELS } from '../utils/scanQuality/scanQuality';
-import { recommendForConfirmed } from '../utils/sizing/fromConfirmed';
+import { REFERENCE_CHART_DISCLAIMER, REFERENCE_SIZING_NOTE, SIZING_BRAND_OPTIONS } from '../utils/sizing/brandCharts';
+import { recommendBrandForConfirmed } from '../utils/sizing/fromConfirmed';
+import { REFERENCE_CHART_UNAVAILABLE } from '../utils/sizing/recommendBrandSize';
 
 const TITLE_ID = 'results-title';
 const HERO_ID = 'results-hero-title';
@@ -27,6 +30,8 @@ const EMPTY_TITLES: Record<Exclude<SizeRecommendation['status'], 'recommended'>,
   'outside-range': 'No size on this chart fits',
   unsupported: 'No recommendation available',
 };
+
+const BRAND_SEGMENTS = SIZING_BRAND_OPTIONS.map((o) => ({ value: o.id, label: o.name }));
 
 /** Results (Step 11): the size recommendation for the confirmed measurements, with save / edit / scan-again actions. */
 export function ResultsPage() {
@@ -39,10 +44,12 @@ export function ResultsPage() {
   const heightCm = useAppStore((s) => s.userInfo.heightCm);
   const fitProfile = useAppStore((s) => s.fitProfile);
   const saveFitProfile = useAppStore((s) => s.saveFitProfile);
+  const brand = useAppStore((s) => s.sizingBrand);
+  const setSizingBrand = useAppStore((s) => s.setSizingBrand);
 
   const recommendation = useMemo(
-    () => (confirmed ? recommendForConfirmed(confirmed, clothingSelection, gender) : null),
-    [confirmed, clothingSelection, gender],
+    () => (confirmed ? recommendBrandForConfirmed(confirmed, clothingSelection, gender, brand) : null),
+    [confirmed, clothingSelection, gender, brand],
   );
 
   return (
@@ -69,6 +76,7 @@ export function ResultsPage() {
             hasProfileForScan={fitProfile?.measuredAt === confirmed.measuredAt && fitProfile.garment === recommendation.garment}
             confidenceOf={(id) => confirmed.measurements.find((m) => m.id === id)?.confidence ?? null}
             scanQuality={scanResult?.measuredAt === confirmed.measuredAt ? (scanResult.scanQuality ?? null) : null}
+            onBrandChange={setSizingBrand}
             onSave={() => {
               const profile = buildFitProfile(confirmed, recommendation);
               if (profile) saveFitProfile(profile);
@@ -106,18 +114,21 @@ export function ResultsPage() {
 }
 
 interface ResultProps {
-  recommendation: SizeRecommendation;
+  recommendation: BrandSizeRecommendation;
   saved: boolean;
   hasProfileForScan: boolean;
   confidenceOf: (id: string) => number | null;
   /** Quality of the scan these measurements came from (Step 14), shown as a small secondary note. */
   scanQuality: ScanQuality | null;
+  onBrandChange: (brand: SizingBrandId) => void;
   onSave: () => void;
   onEdit: () => void;
 }
 
-function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQuality, onSave, onEdit }: ResultProps) {
+function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQuality, onBrandChange, onSave, onEdit }: ResultProps) {
   const { status, size, fit, alternativeSize, basedOnUncertain, garment, reason, chartName, measurementsUsed, fitPreference } = recommendation;
+  const { brand, brandName, chartAvailable } = recommendation;
+  const isBrand = brand !== 'generic';
   const recommended = status === 'recommended' && size !== null;
   const saveLabel = saved ? 'Saved to Profile' : hasProfileForScan ? 'Update Fit Profile' : 'Save Fit Profile';
 
@@ -132,7 +143,9 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQu
         alternativeSize={alternativeSize}
         basedOnUncertain={basedOnUncertain}
         fitPreference={fitPreference}
-        emptyTitle={status === 'recommended' ? undefined : EMPTY_TITLES[status]}
+        emptyTitle={status === 'recommended' ? undefined : chartAvailable ? EMPTY_TITLES[status] : REFERENCE_CHART_UNAVAILABLE}
+        fitLabel={chartAvailable ? undefined : REFERENCE_CHART_UNAVAILABLE}
+        brandName={isBrand ? brandName : null}
       >
         {scanQuality && (
           <p className="result-hero__quality" data-level={scanQuality.level}>
@@ -141,6 +154,27 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQu
         )}
       </SizeHero>
 
+      <motion.section className="result-card result-brand" aria-labelledby="results-brand-title" variants={fadeUpItem}>
+        <h2 id="results-brand-title" className="result-card__title">
+          Brand
+        </h2>
+        <p className="result-card__text">
+          Use reference brand sizing. Generic uses SizerAI's generic size chart.
+        </p>
+        <SegmentedControl
+          legend="Use reference brand sizing"
+          options={BRAND_SEGMENTS}
+          value={brand}
+          onChange={onBrandChange}
+          className="segmented--block"
+        />
+        {isBrand && (
+          <p className="result-card__note">
+            {REFERENCE_SIZING_NOTE} {REFERENCE_CHART_DISCLAIMER}
+          </p>
+        )}
+      </motion.section>
+
       <motion.section className="result-card" aria-labelledby="results-why-title" variants={fadeUpItem}>
         <h2 id="results-why-title" className="result-card__title">
           {recommended ? 'Why this size?' : 'Why no size?'}
@@ -148,12 +182,18 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQu
         <p className="result-card__text">{reason}</p>
         {recommended && garment && (
           <p className="result-card__text">
-            The recommendation considers your body measurements, the {getClothingItem(garment).label} size chart and
-            your selected fit preference ({FIT_DEFINITIONS[fitPreference].label}). The preference only decides between
+            The recommendation considers your body measurements, the {isBrand ? `${brandName} reference ` : ''}
+            {getClothingItem(garment).label} size chart and your selected fit preference ({FIT_DEFINITIONS[fitPreference].label}). The preference only decides between
             neighbouring sizes near a size boundary; it does not change or improve your measurements.
           </p>
         )}
-        {chartName && (
+        {chartName && isBrand && (
+          <p className="result-card__note">
+            {chartName}: a hand-entered reference chart, not official {brandName} data. {REFERENCE_CHART_DISCLAIMER} This is a
+            rule-based comparison, not a machine-learning prediction.
+          </p>
+        )}
+        {chartName && !isBrand && (
           <p className="result-card__note">
             {chartName}: a generic size chart, not a brand's. Sizes vary between brands. This is a rule-based comparison,
             not a machine-learning prediction.

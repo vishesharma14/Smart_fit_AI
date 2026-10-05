@@ -49,3 +49,22 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+
+/* Full-width variant with touch-sized options (e.g. the brand choice on Results). */
+.segmented--block {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  width: 100%;
+  border-radius: var(--radius-lg);
+}
+
+.segmented--block .segmented__option {
+  min-height: 2.75rem;
+  border-radius: var(--radius-md);
+}
+
+@media (max-width: 30rem) {
+  .segmented--block {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -1,6 +1,6 @@
 import type { ClothingType, FitPreference } from './domain';
 import type { MeasurementId, MeasurementStatus } from './measurement';
-import type { FitStatus, SizeLabel } from './sizing';
+import type { FitStatus, SizeLabel, SizingBrandId } from './sizing';
 
 /*
  * Saved fit profile and lightweight scan history (Step 11). Numbers and labels only — never images, frames,
@@ -34,6 +34,8 @@ export interface ScanRecord {
 export interface FitProfile extends ScanRecord {
   /** Fit preference the size was recommended for (profiles saved before Step 13 load as `regular`). */
   fitPreference: FitPreference;
+  /** Chart the size was recommended on (profiles saved before Step 15 load as `generic`). */
+  brand: SizingBrandId;
   alternativeSize: SizeLabel | null;
   /** True when the size rests on uncertain (estimated) measurements. */
   basedOnUncertain: boolean;

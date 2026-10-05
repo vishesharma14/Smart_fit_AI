@@ -13,6 +13,7 @@ import { getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { formatSavedDate, startScanPath } from '../utils/profile/format';
+import { REFERENCE_SIZING_NOTE, brandName } from '../utils/sizing/brandCharts';
 import { FIT_LABELS } from '../utils/sizing/recommendSize';
 
 const TITLE_ID = 'profile-title';
@@ -99,6 +100,7 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
         alternativeSize={profile.alternativeSize}
         basedOnUncertain={profile.basedOnUncertain}
         fitPreference={profile.fitPreference}
+        brandName={profile.brand !== 'generic' ? brandName(profile.brand) : null}
       >
         <dl className="profile-facts">
           <div>
@@ -125,6 +127,7 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
           <p className="result-card__text">No measurements with a value were saved.</p>
         )}
         {profile.chartName && <p className="result-card__note">Size from the {profile.chartName}.</p>}
+        {profile.brand !== 'generic' && <p className="result-card__note">{REFERENCE_SIZING_NOTE}</p>}
       </motion.section>
 
       <motion.section className="result-card" aria-labelledby="profile-history-title" variants={fadeUpItem}>
