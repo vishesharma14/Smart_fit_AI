@@ -1,9 +1,6 @@
-import { Suspense, lazy } from 'react';
 import { nearestView } from '../../utils/scan360/views';
+import MannequinCanvas from './mannequin/MannequinCanvas';
 import './BodyGuideOverlay.css';
-
-// Three.js is only downloaded when the camera preview (and so this guide) is shown.
-const MannequinCanvas = lazy(() => import('./mannequin/MannequinCanvas'));
 
 interface BodyGuideOverlayProps {
   /**
@@ -35,9 +32,9 @@ export function BodyGuideOverlay({ yawDeg, mirrored, range }: BodyGuideOverlayPr
     <div className="body-guide">
       <div className="body-guide__vignette" aria-hidden="true" />
 
-      <Suspense fallback={null}>
-        <MannequinCanvas yaw={mirrored ? yaw : -yaw} range={range} />
-      </Suspense>
+      {/* Imported statically: a lazily loaded chunk could be missing after a redeploy (a page opened before the
+          deploy requests the old file name) and crash the scan page. */}
+      <MannequinCanvas yaw={mirrored ? yaw : -yaw} range={range} />
 
       <svg className="body-guide__frame" viewBox="0 0 300 400" preserveAspectRatio="none" aria-hidden="true">
         <path d="M22 58V36a14 14 0 0 1 14-14h22" />

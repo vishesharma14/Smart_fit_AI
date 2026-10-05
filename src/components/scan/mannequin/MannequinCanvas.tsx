@@ -14,9 +14,8 @@ interface MannequinCanvasProps {
 }
 
 /**
- * React wrapper around the Three.js mannequin scene. Loaded lazily so the 3D
- * code is only downloaded once the camera preview is shown. Draws only on
- * resize and while turning to a new angle.
+ * React wrapper around the Three.js mannequin scene. Draws only on resize and
+ * while turning to a new angle.
  */
 export default function MannequinCanvas({ yaw, range = FULL_RANGE }: MannequinCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);

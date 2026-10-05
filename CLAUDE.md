@@ -213,7 +213,7 @@ src/
   components/sizing/  SizeRecommendationCard (shown on the review page after confirmation)
   components/results/ SizeHero, MeasurementList, results.css (Results + Profile pages)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
-                      scene (renders on demand only), lazily loaded React wrapper
+                      scene (renders on demand only), React wrapper (statically imported)
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage,
                       MeasurementReviewPage, ResultsPage, ProfilePage, NotFoundPage)
@@ -279,7 +279,8 @@ Intended stack:
 - Framer Motion (animation)
 - Custom CSS (no UI framework unless explicitly approved)
 - Lucide React (icons)
-- Three.js (only for the 3D reference mannequin on the Body Scan page; lazy-loaded)
+- Three.js (only for the 3D reference mannequin on the Body Scan page; bundled statically — a lazy chunk could be
+  missing after a redeploy and crash the scan page)
 - @mediapipe/tasks-vision (on-device pose detection on the Body Scan page; lazy-loaded)
 
 If the repository already contains a working setup, use the existing project choices
