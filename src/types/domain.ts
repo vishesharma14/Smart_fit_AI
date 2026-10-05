@@ -73,18 +73,5 @@ export interface SizePrediction {
   createdAt: string;
 }
 
-/** A saved set of measurements and preferences the user can reuse. */
-export interface FitProfile {
-  id: string;
-  name: string;
-  measurements: BodyMeasurements;
-  createdAt: string;
-  updatedAt: string;
-}
+// Saved fit profile and scan history types live in types/profile.ts (Step 11).
 
-/** Metadata about a completed scan. Raw camera frames are never stored here. */
-export interface ScanRecord {
-  id: string;
-  measurements: BodyMeasurements;
-  createdAt: string;
-}

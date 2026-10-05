@@ -4,6 +4,8 @@ import { BodyScanPage } from '../pages/BodyScanPage';
 import { ClothingSelectionPage } from '../pages/ClothingSelectionPage';
 import { HomePage } from '../pages/HomePage';
 import { MeasurementReviewPage } from '../pages/MeasurementReviewPage';
+import { ProfilePage } from '../pages/ProfilePage';
+import { ResultsPage } from '../pages/ResultsPage';
 import { UserInfoPage } from '../pages/UserInfoPage';
 import { PATHS } from './paths';
 
@@ -17,6 +19,8 @@ export const router = createBrowserRouter([
       { path: PATHS.clothing, element: <ClothingSelectionPage /> },
       { path: PATHS.scan, element: <BodyScanPage /> },
       { path: PATHS.measurements, element: <MeasurementReviewPage /> },
+      { path: PATHS.results, element: <ResultsPage /> },
+      { path: PATHS.profile, element: <ProfilePage /> },
     ],
   },
 ]);

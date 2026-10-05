@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, CircleCheck, Info, PencilLine, ScanLine, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CircleCheck, Info, PencilLine, ScanLine, X } from 'lucide-react';
+import { useLocation } from 'react-router';
 import { Button } from '../components/Button';
 import { FormCard } from '../components/form/FormCard';
 import { SizeRecommendationCard } from '../components/sizing/SizeRecommendationCard';
@@ -105,9 +106,13 @@ interface ReviewProps {
 }
 
 function Review({ result, confirmed, onConfirm, recommend }: ReviewProps) {
+  // "Edit Measurements" on the Results page opens this page straight in edit mode.
+  const openInEditMode = (useLocation().state as { edit?: boolean } | null)?.edit === true;
   const [measurements, setReviewed] = useState(() => initialReview(result, confirmed));
-  const [editing, setEditing] = useState(false);
-  const [drafts, setDrafts] = useState<DraftValues>({});
+  const [editing, setEditing] = useState(() => openInEditMode && measurements.some(isEditable));
+  const [drafts, setDrafts] = useState<DraftValues>(() =>
+    editing ? Object.fromEntries(measurements.filter(isEditable).map((m) => [m.id, draftFor(m)])) : {},
+  );
   const [errors, setErrors] = useState<Partial<Record<ReviewedMeasurement['id'], string>>>({});
 
   const anyEditable = measurements.some(isEditable);
@@ -200,6 +205,14 @@ function Review({ result, confirmed, onConfirm, recommend }: ReviewProps) {
           </motion.p>
         )}
         {isConfirmed && !editing && confirmed && <SizeRecommendationCard key="size" recommendation={recommend(confirmed)} />}
+        {isConfirmed && !editing && (
+          <motion.div key="results-link" className="measure-review__results-link" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Button to={PATHS.results} size="lg">
+              View Results
+              <ArrowRight aria-hidden="true" size={20} />
+            </Button>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <motion.div className="measure-review__actions" variants={fadeUpItem}>

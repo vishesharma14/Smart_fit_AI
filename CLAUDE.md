@@ -39,11 +39,12 @@ Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Informati
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
-no real-person data collected yet), 10 (rule-based size recommendation engine).
+no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
-`/measurements` Measurement Review (step 4 of 4).
+`/measurements` Measurement Review (step 4 of 4) → `/results` Results → `/profile` Fit Profile (after the flow; no step
+progress).
 
 Body Scan status: real camera (getUserMedia, video only) with on-device lighting
 and movement checks plus **MediaPipe Pose Landmarker (Full model)** running on-device
@@ -156,7 +157,19 @@ within 3 cm outside the chart get the end size (tight/loose), further out = `out
 unsupported / model-unit / implausible primary values → `insufficient-data` (never substituted); `uncertain` values are
 used but flagged; children's sizes → `unsupported`. `fromConfirmed.ts` `recommendForConfirmed` uses the confirmed
 measurements and the scanned garment (else the clothing selection); the Measurement Review page shows
-`components/sizing/SizeRecommendationCard` once measurements are confirmed (no separate results page yet).
+`components/sizing/SizeRecommendationCard` once measurements are confirmed, plus a "View Results" link.
+Results and Fit Profile (Step 11): `ResultsPage` (`/results`) shows the recommendation for the confirmed measurements
+(`components/results/SizeHero` — size never invented: insufficient data shows no size — "Why this size?", measurements
+used with confidence via `MeasurementList`) and Save Fit Profile / Edit Measurements (opens the review page in edit
+mode via router state `{ edit: true }`) / Scan Again. Saving is only possible for a recommended size:
+`utils/profile/fitProfile.ts` `buildFitProfile` → `FitProfile` (`types/profile.ts`: garment, size, fit, alternative,
+chart, measuredAt / confirmedAt / savedAt, confirmed measurements with a cm value); re-saving the same scan updates it
+("Update Fit Profile"). Fit slice: `saveFitProfile` (also upserts a lightweight `ScanRecord` history, newest first,
+max 10, one entry per scan + garment) and `deleteFitProfile`. `ProfilePage` (`/profile`): saved size, last scan / saved
+dates, saved measurements, previous results, Scan Again, View latest results, Delete Profile (two-step); empty state
+with Start a scan (details page until a height is entered). `fitProfile` and `scanHistory` are persisted with the
+display preferences in browser storage on this device only (numbers only; validated on load by `isFitProfile` /
+`isScanRecord`; deletable). `FlowStepLayout` takes an optional `step` (none → `topbarExtra`).
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
@@ -171,7 +184,8 @@ use cues actually in the camera's view. MediaPipe detects people from the head/u
 legs-only frame can't be detected; tracking can continue once detected.
 Scan session state is local to the page (no global state).
 User information and the clothing selection are kept in memory only (not
-persisted); height/weight display units, theme and the voice-guidance preference are persisted.
+persisted); height/weight display units, theme, the voice-guidance preference and the user-saved fit profile
+(+ short history) are persisted.
 Fit-flow pages share `layouts/FlowStepLayout` (top bar + intro column + form,
 Back/Continue) and `components/form/FormCard`.
 
@@ -192,15 +206,17 @@ src/
   components/scan/validation/  ValidationPanel (?poseDebug only, lazy): protocol, tape ground truth, scan records
                       (usable/unusable), metrics, repeatability, Anny reliability, export; useScanPerformance
   components/sizing/  SizeRecommendationCard (shown on the review page after confirmation)
+  components/results/ SizeHero, MeasurementList, results.css (Results + Profile pages)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage,
-                      MeasurementReviewPage)
+                      MeasurementReviewPage, ResultsPage, ProfilePage)
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
-                      (user, fit, settings); only display units/theme/voice preference are persisted;
+                      (user, fit, settings); display units/theme/voice preference and the saved fit
+                      profile + history are persisted (device only);
                       user slice holds scanMeasurements (engine output) and measurements (confirmed);
                       validationStore = separate in-memory store for validation records (never persisted)
   hooks/              reusable hooks (useDocumentTitle, useUserInfoForm, useClothingSelectionForm,
@@ -225,6 +241,7 @@ src/
                       syntheticFixture (tests only)
   utils/sizing/       size recommendation (Step 10): sizeCharts (generic charts + rules), recommendSize (engine),
                       fromConfirmed (confirmed measurements → engine)
+  utils/profile/      fit profile (Step 11): fitProfile (build, history, storage guards), format (dates, scan path)
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),
@@ -237,6 +254,7 @@ src/
   types/silhouette.ts   body-outline profile types (numbers only, never the mask)
   types/validation.ts   validation subject / tape measurement / scan attempt types (numbers and labels only)
   types/sizing.ts       size chart / size recommendation types
+  types/profile.ts      saved fit profile / scan history types
   styles/             tokens.css (design tokens) + global.css (reset/base)
 ```
 
