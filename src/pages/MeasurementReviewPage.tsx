@@ -199,8 +199,8 @@ function Review({ result, confirmed, onConfirm, recommend }: ReviewProps) {
           >
             <CircleCheck aria-hidden="true" size={20} strokeWidth={2} />
             <span>
-              <strong>Measurements confirmed.</strong> They are kept in memory on this device for this session. Your
-              size recommendation is shown below.
+              <strong>Measurements confirmed.</strong> They are kept in memory on this device for this session (unless
+              you save them to your fit profile). Your size recommendation is shown below.
             </span>
           </motion.p>
         )}

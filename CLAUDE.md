@@ -39,12 +39,17 @@ Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Informati
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
-no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile).
+no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
+Welcome-page profile link, wording review).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
 `/measurements` Measurement Review (step 4 of 4) → `/results` Results → `/profile` Fit Profile (after the flow; no step
-progress).
+progress). Unknown paths → `NotFoundPage` (`*` route). The Welcome page shows "My Fit Profile" once a profile is saved.
+`README.md` is the public project description (keep it technically honest when features change). `index.html` sets a
+Content-Security-Policy `connect-src 'self' blob: data:`: the page may only connect to its own origin (blocks MediaPipe's
+built-in usage logging to odml.pa.googleapis.com, which has no opt-out) — keep it when adding features; any new network
+destination must be deliberate.
 
 Body Scan status: real camera (getUserMedia, video only) with on-device lighting
 and movement checks plus **MediaPipe Pose Landmarker (Full model)** running on-device
@@ -211,7 +216,7 @@ src/
                       scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage,
-                      MeasurementReviewPage, ResultsPage, ProfilePage)
+                      MeasurementReviewPage, ResultsPage, ProfilePage, NotFoundPage)
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
