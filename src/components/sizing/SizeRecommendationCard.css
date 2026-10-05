@@ -76,6 +76,10 @@
 }
 
 .size-rec__unavailable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   font-weight: 600;
   color: var(--color-text);
