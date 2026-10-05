@@ -15,14 +15,16 @@ interface SegmentedControlProps<T extends string> {
   options: SegmentOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Extra class for layout variants (e.g. a full-width control). */
+  className?: string;
 }
 
 /** Compact switch between a few options. Built on native radio inputs for keyboard and screen-reader support. */
-export function SegmentedControl<T extends string>({ legend, options, value, onChange }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({ legend, options, value, onChange, className }: SegmentedControlProps<T>) {
   const name = useId();
 
   return (
-    <fieldset className="segmented">
+    <fieldset className={className ? `segmented ${className}` : 'segmented'}>
       <legend className="visually-hidden">{legend}</legend>
       {options.map((option) => {
         const checked = option.value === value;

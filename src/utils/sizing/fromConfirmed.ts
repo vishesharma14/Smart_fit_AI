@@ -1,7 +1,9 @@
 import type { ClothingSelection, ClothingType, FitPreference, Gender } from '../../types/domain';
 import type { ConfirmedMeasurements } from '../../types/measurement';
-import type { SizeRecommendation } from '../../types/sizing';
+import type { BrandSizeRecommendation, SizeRecommendation, SizingBrandId } from '../../types/sizing';
 import { DEFAULT_FIT_PREFERENCE, fitsFor } from '../clothingCatalog';
+import { brandName } from './brandCharts';
+import { recommendBrandSize } from './recommendBrandSize';
 import { recommendSize } from './recommendSize';
 
 /**
@@ -41,4 +43,21 @@ export function recommendForConfirmed(
     };
   }
   return recommendSize({ garment, measurements: confirmed.measurements, audience, fitPreference });
+}
+
+/**
+ * Size for the confirmed measurements on the chosen sizing chart (Step 15): Generic is exactly
+ * `recommendForConfirmed`; a brand uses its reference chart with the same rules and the same fit preference.
+ */
+export function recommendBrandForConfirmed(
+  confirmed: ConfirmedMeasurements | null,
+  clothingSelection: ClothingSelection | null,
+  audience: Gender | null,
+  brand: SizingBrandId,
+): BrandSizeRecommendation {
+  if (brand === 'generic' || !confirmed) {
+    return { ...recommendForConfirmed(confirmed, clothingSelection, audience), brand, brandName: brandName(brand), chartAvailable: true };
+  }
+  const garment = confirmed.clothingType ?? clothingSelection?.type ?? null;
+  return recommendBrandSize({ brand, garment, measurements: confirmed.measurements, fitPreference: fitPreferenceFor(garment, clothingSelection), audience });
 }

@@ -39,7 +39,8 @@ export interface RecommendSizeInput {
   audience?: Gender | null;
   /** How the user likes clothes to fit (default Regular = no adjustment). */
   fitPreference?: FitPreference;
-  charts?: Record<ClothingType, SizeChart>;
+  /** Charts to apply (default: the generic charts). A garment without a chart here is unsupported. */
+  charts?: Partial<Record<ClothingType, SizeChart>>;
 }
 
 type Resolved =
@@ -134,10 +135,10 @@ export function recommendSize({
   fitPreference = 'regular',
   charts = SIZE_CHARTS,
 }: RecommendSizeInput): SizeRecommendation {
-  if (!garment || !charts[garment]) {
+  const chart = garment ? charts[garment] : undefined;
+  if (!garment || !chart) {
     return result({ status: 'unsupported', garment, fitPreference, reason: 'No garment is selected, so there is no size chart to compare with.' });
   }
-  const chart = charts[garment];
   const garmentLabel = getClothingItem(garment).label;
   if (audience === 'children') {
     return result({

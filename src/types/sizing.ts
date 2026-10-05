@@ -88,3 +88,27 @@ export interface SizeRecommendation {
    */
   preferenceAdjustment: { from: SizeLabel; to: SizeLabel } | null;
 }
+
+/*
+ * Reference brand sizing (Step 15). Brand charts are small, hand-entered reference datasets in the style of the
+ * brands' published letter-size charts — not official data and not a live brand API.
+ */
+
+/** `generic` = the Step 10 generic charts; the others are reference brand charts. */
+export type SizingBrandId = 'generic' | 'nike' | 'levis' | 'hm';
+
+export interface BrandSizeChart {
+  brandId: Exclude<SizingBrandId, 'generic'>;
+  brandName: string;
+  /** Garments with a reference chart; any other garment has no brand result. */
+  charts: Partial<Record<ClothingType, SizeChart>>;
+  /** Where the values come from and how far to trust them (shown with the result). */
+  sourceNote: string;
+}
+
+export interface BrandSizeRecommendation extends SizeRecommendation {
+  brand: SizingBrandId;
+  brandName: string;
+  /** False when the brand has no reference chart for the garment (status `unsupported`, no size). */
+  chartAvailable: boolean;
+}

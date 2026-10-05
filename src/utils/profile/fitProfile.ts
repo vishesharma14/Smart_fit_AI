@@ -1,7 +1,8 @@
 import type { ConfirmedMeasurements } from '../../types/measurement';
 import type { FitProfile, SavedMeasurement, ScanRecord } from '../../types/profile';
-import { SIZE_LABELS, type SizeRecommendation } from '../../types/sizing';
+import { SIZE_LABELS, type SizeRecommendation, type SizingBrandId } from '../../types/sizing';
 import { DEFAULT_FIT_PREFERENCE, isFitPreference } from '../clothingCatalog';
+import { DEFAULT_SIZING_BRAND, isSizingBrandId } from '../sizing/brandCharts';
 
 /*
  * Builds the saved fit profile from the confirmed measurements and their size recommendation (Step 11).
@@ -22,10 +23,13 @@ export function savedMeasurementsFrom(confirmed: ConfirmedMeasurements): SavedMe
   );
 }
 
+/** A recommendation, optionally from a reference brand chart (Step 15; none = Generic). */
+type ProfileRecommendation = SizeRecommendation & { brand?: SizingBrandId };
+
 /** The profile to save, or null when the recommendation has no size. */
 export function buildFitProfile(
   confirmed: ConfirmedMeasurements,
-  recommendation: SizeRecommendation,
+  recommendation: ProfileRecommendation,
   now: Date = new Date(),
 ): FitProfile | null {
   if (recommendation.status !== 'recommended' || !recommendation.size || !recommendation.garment) return null;
@@ -35,6 +39,7 @@ export function buildFitProfile(
     size: recommendation.size,
     fit: recommendation.fit,
     fitPreference: recommendation.fitPreference,
+    brand: recommendation.brand ?? DEFAULT_SIZING_BRAND,
     alternativeSize: recommendation.alternativeSize,
     basedOnUncertain: recommendation.basedOnUncertain,
     chartName: recommendation.chartName ?? '',
@@ -56,7 +61,7 @@ export function upsertHistory(history: readonly ScanRecord[], record: ScanRecord
 }
 
 /** Whether the profile was saved from exactly this confirmation (same scan, garment and confirmation). */
-export function isSavedFrom(profile: FitProfile | null, confirmed: ConfirmedMeasurements | null, recommendation: SizeRecommendation): boolean {
+export function isSavedFrom(profile: FitProfile | null, confirmed: ConfirmedMeasurements | null, recommendation: ProfileRecommendation): boolean {
   return Boolean(
     profile &&
       confirmed &&
@@ -64,7 +69,8 @@ export function isSavedFrom(profile: FitProfile | null, confirmed: ConfirmedMeas
       profile.confirmedAt === confirmed.confirmedAt &&
       profile.garment === recommendation.garment &&
       profile.size === recommendation.size &&
-      profile.fitPreference === recommendation.fitPreference,
+      profile.fitPreference === recommendation.fitPreference &&
+      profile.brand === (recommendation.brand ?? DEFAULT_SIZING_BRAND),
   );
 }
 
@@ -80,15 +86,20 @@ export function isScanRecord(value: unknown): value is ScanRecord {
 
 /**
  * A stored profile as the app uses it: a missing or unknown fit preference (profiles saved before fit preferences
- * existed) becomes Regular. Returns null for anything that is not a valid profile.
+ * existed) becomes Regular, and a missing or unknown brand (saved before Step 15) becomes Generic. Returns null for
+ * anything that is not a valid profile.
  */
 export function normalizeFitProfile(value: unknown): FitProfile | null {
   if (!isFitProfile(value)) return null;
-  const stored = (value as { fitPreference?: unknown }).fitPreference;
-  return { ...value, fitPreference: isFitPreference(stored) ? stored : DEFAULT_FIT_PREFERENCE };
+  const { fitPreference, brand } = value as { fitPreference?: unknown; brand?: unknown };
+  return {
+    ...value,
+    fitPreference: isFitPreference(fitPreference) ? fitPreference : DEFAULT_FIT_PREFERENCE,
+    brand: isSizingBrandId(brand) ? brand : DEFAULT_SIZING_BRAND,
+  };
 }
 
-/** Structure check for stored profiles (the fit preference is optional here; see `normalizeFitProfile`). */
+/** Structure check for stored profiles (fit preference and brand are optional here; see `normalizeFitProfile`). */
 export function isFitProfile(value: unknown): value is FitProfile {
   if (!isScanRecord(value)) return false;
   const p = value as unknown as Record<string, unknown>;
