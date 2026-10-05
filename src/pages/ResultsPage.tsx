@@ -10,6 +10,7 @@ import { FlowStepLayout } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
 import { useAppStore } from '../store/useAppStore';
 import type { SizeRecommendation } from '../types/sizing';
+import { FIT_DEFINITIONS, getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { buildFitProfile, isSavedFrom } from '../utils/profile/fitProfile';
@@ -111,7 +112,7 @@ interface ResultProps {
 }
 
 function Result({ recommendation, saved, hasProfileForScan, confidenceOf, onSave, onEdit }: ResultProps) {
-  const { status, size, fit, alternativeSize, basedOnUncertain, garment, reason, chartName, measurementsUsed } = recommendation;
+  const { status, size, fit, alternativeSize, basedOnUncertain, garment, reason, chartName, measurementsUsed, fitPreference } = recommendation;
   const recommended = status === 'recommended' && size !== null;
   const saveLabel = saved ? 'Saved to Profile' : hasProfileForScan ? 'Update Fit Profile' : 'Save Fit Profile';
 
@@ -125,6 +126,7 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, onSave
         fit={fit}
         alternativeSize={alternativeSize}
         basedOnUncertain={basedOnUncertain}
+        fitPreference={fitPreference}
         emptyTitle={status === 'recommended' ? undefined : EMPTY_TITLES[status]}
       />
 
@@ -133,6 +135,13 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, onSave
           {recommended ? 'Why this size?' : 'Why no size?'}
         </h2>
         <p className="result-card__text">{reason}</p>
+        {recommended && garment && (
+          <p className="result-card__text">
+            The recommendation considers your body measurements, the {getClothingItem(garment).label} size chart and
+            your selected fit preference ({FIT_DEFINITIONS[fitPreference].label}). The preference only decides between
+            neighbouring sizes near a size boundary; it does not change or improve your measurements.
+          </p>
+        )}
         {chartName && (
           <p className="result-card__note">
             {chartName}: a generic size chart, not a brand's. Sizes vary between brands. This is a rule-based comparison,

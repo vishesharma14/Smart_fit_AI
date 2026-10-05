@@ -98,6 +98,7 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
         fit={profile.fit}
         alternativeSize={profile.alternativeSize}
         basedOnUncertain={profile.basedOnUncertain}
+        fitPreference={profile.fitPreference}
       >
         <dl className="profile-facts">
           <div>

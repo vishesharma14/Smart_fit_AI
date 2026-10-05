@@ -66,6 +66,12 @@ export const SIZING_RULES = {
   edgeBandFraction: 0.2,
   /** Within this distance (cm) of a size boundary the neighbouring size is offered as an alternative. */
   alternativeWithinCm: 1,
+  /**
+   * Slim Fit takes the smaller size only when the deciding measurement exceeds that size's range by less than this
+   * (cm) — a snug but wearable fit. Relaxed Fit takes the larger size when the measurement is in the top band
+   * (`edgeBandFraction`) of its size.
+   */
+  slimReachCm: 1,
   /** Values outside this range (cm) are not plausible body circumferences and are rejected as invalid. */
   plausibleCm: { min: 30, max: 250 },
 } as const;

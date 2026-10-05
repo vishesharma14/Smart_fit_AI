@@ -1,4 +1,4 @@
-import type { ClothingType, Gender } from '../../types/domain';
+import type { ClothingType, FitPreference, Gender } from '../../types/domain';
 import type { MeasurementId, MeasurementStatus } from '../../types/measurement';
 import {
   SIZE_LABELS,
@@ -24,6 +24,10 @@ import { SIZE_CHARTS, SIZING_RULES } from './sizeCharts';
  * - Fit: where the deciding measurement sits within its size's range (near the top = slightly tight, near the
  *   bottom = slightly loose, else good fit). A neighbouring size is offered when a value sits at a boundary.
  * - `uncertain` measurements are used but flagged, so the result says it rests on an estimate.
+ * - Fit preference (Regular = the baseline above) only chooses between neighbouring sizes at a boundary, and only
+ *   where the measurements allow it: Slim takes the smaller size when the deciding measurement is within
+ *   `SIZING_RULES.slimReachCm` above that size's range (and the other measurement fits it); Relaxed takes the larger
+ *   size when the deciding measurement is in the top band of its size. Missing data and "no size" are unaffected.
  *
  * Deterministic and rule-based: the same measurements always give the same result. No machine learning.
  */
@@ -33,6 +37,8 @@ export interface RecommendSizeInput {
   measurements: readonly SizingMeasurementInput[];
   /** Size range the user shops in; only adult charts exist, so `children` is unsupported. */
   audience?: Gender | null;
+  /** How the user likes clothes to fit (default Regular = no adjustment). */
+  fitPreference?: FitPreference;
   charts?: Record<ClothingType, SizeChart>;
 }
 
@@ -113,13 +119,23 @@ function result(partial: Partial<SizeRecommendation> & Pick<SizeRecommendation, 
     measurementsUsed: [],
     basedOnUncertain: false,
     chartName: null,
+    fitPreference: 'regular',
+    preferenceAdjustment: null,
     ...partial,
   };
 }
 
-export function recommendSize({ garment, measurements, audience = null, charts = SIZE_CHARTS }: RecommendSizeInput): SizeRecommendation {
+const PREFERENCE_LABELS: Record<FitPreference, string> = { slim: 'Slim Fit', regular: 'Regular Fit', relaxed: 'Relaxed Fit' };
+
+export function recommendSize({
+  garment,
+  measurements,
+  audience = null,
+  fitPreference = 'regular',
+  charts = SIZE_CHARTS,
+}: RecommendSizeInput): SizeRecommendation {
   if (!garment || !charts[garment]) {
-    return result({ status: 'unsupported', garment, reason: 'No garment is selected, so there is no size chart to compare with.' });
+    return result({ status: 'unsupported', garment, fitPreference, reason: 'No garment is selected, so there is no size chart to compare with.' });
   }
   const chart = charts[garment];
   const garmentLabel = getClothingItem(garment).label;
@@ -127,10 +143,11 @@ export function recommendSize({ garment, measurements, audience = null, charts =
     return result({
       status: 'unsupported',
       garment,
+      fitPreference,
       reason: `Only adult size charts are available, so no ${garmentLabel} size can be recommended in children's sizes.`,
     });
   }
-  const base = { garment, chartName: chart.name };
+  const base = { garment, chartName: chart.name, fitPreference };
   const primaryLabel = measurementLabel(chart.primary.id);
 
   const primary = resolveMeasurement(measurements, chart.primary.id);
@@ -203,7 +220,7 @@ export function recommendSize({ garment, measurements, audience = null, charts =
   const deciding = secondaryDecides ? used[1] : used[0];
   const other = secondaryDecides ? used[0] : used[1];
   const otherIndex = secondaryDecides ? primaryLoc.index : secondaryIndex;
-  const size = SIZE_LABELS[index];
+  const baseSize = SIZE_LABELS[index];
 
   let fit: FitStatus = decidingLoc.band === 'high' ? 'slightly-tight' : decidingLoc.band === 'low' ? 'slightly-loose' : 'good-fit';
   if (other && (otherIndex === null || otherIndex < index) && fit === 'good-fit') fit = 'slightly-loose';
@@ -211,36 +228,70 @@ export function recommendSize({ garment, measurements, audience = null, charts =
   // A neighbouring size when the deciding value sits right at a boundary.
   let alternativeSize: SizeLabel | null = null;
   const near = SIZING_RULES.alternativeWithinCm;
+  const smallerFitsOther = otherIndex === null || otherIndex <= index - 1;
   if (decidingLoc.side === 'inside' && decidingLoc.toUpper <= near && index < SIZE_LABELS.length - 1) {
     alternativeSize = SIZE_LABELS[index + 1];
-  } else if (decidingLoc.side === 'inside' && decidingLoc.toLower < near && index > 0 && (otherIndex === null || otherIndex <= index - 1)) {
+  } else if (decidingLoc.side === 'inside' && decidingLoc.toLower < near && index > 0 && smallerFitsOther) {
     alternativeSize = SIZE_LABELS[index - 1];
   }
 
+  // Fit preference: only between neighbouring sizes, only where the measurements still fit the other size.
+  let finalIndex = index;
+  if (decidingLoc.side === 'inside') {
+    if (fitPreference === 'slim' && index > 0 && decidingLoc.toLower < SIZING_RULES.slimReachCm && smallerFitsOther) {
+      finalIndex = index - 1;
+    } else if (fitPreference === 'relaxed' && index < SIZE_LABELS.length - 1 && decidingLoc.band === 'high') {
+      finalIndex = index + 1;
+    }
+  }
+  const size = SIZE_LABELS[finalIndex];
+  const preferenceAdjustment = finalIndex !== index ? { from: baseSize, to: size } : null;
+  if (preferenceAdjustment) {
+    // The smaller size sits just below the measurement (snug); the larger one just above it (roomy).
+    fit = finalIndex < index ? 'slightly-tight' : 'slightly-loose';
+    alternativeSize = baseSize;
+  }
+
   const sentences = [
-    `Your ${deciding.label.toLowerCase()} of ${fmt(deciding.valueCm)} falls in size ${size} on the ${chart.name}.`,
+    `Your ${deciding.label.toLowerCase()} of ${fmt(deciding.valueCm)} falls in size ${baseSize} on the ${chart.name}.`,
   ];
   if (secondaryDecides) {
-    sentences.push(`Your ${used[0].label.toLowerCase()} alone points to ${used[0].sizeForMeasurement}, but ${deciding.label.toLowerCase()} needs ${size}, so ${size} is recommended to fit both.`);
-  } else if (other && other.sizeForMeasurement !== size) {
+    sentences.push(`Your ${used[0].label.toLowerCase()} alone points to ${used[0].sizeForMeasurement}, but ${deciding.label.toLowerCase()} needs ${baseSize}, so ${baseSize} is recommended to fit both.`);
+  } else if (other && other.sizeForMeasurement !== baseSize) {
     sentences.push(
       other.sizeForMeasurement
         ? `Your ${other.label.toLowerCase()} points to ${other.sizeForMeasurement}, so the garment may be roomier there.`
         : `Your ${other.label.toLowerCase()} is below the smallest size, so the garment may be roomier there.`,
     );
   }
-  if (decidingLoc.side === 'above') sentences.push(`It is above the ${size} range, so ${size} may feel tight.`);
-  else if (decidingLoc.side === 'below') sentences.push(`It is below the ${size} range, so ${size} may feel loose.`);
-  else if (fit === 'slightly-tight') sentences.push(`It is near the top of the ${size} range, so the fit may be slightly tight.`);
-  else if (fit === 'slightly-loose' && decidingLoc.band === 'low') sentences.push(`It is near the bottom of the ${size} range, so the fit may be slightly loose.`);
-  if (alternativeSize) sentences.push(`You are at the boundary with ${alternativeSize}; consider trying both.`);
+  const preferenceLabel = PREFERENCE_LABELS[fitPreference];
+  if (preferenceAdjustment) {
+    sentences.push(
+      finalIndex < index
+        ? `It is just above the ${size} range, so with your ${preferenceLabel} preference ${size} is recommended for a closer fit (${baseSize} is the regular choice).`
+        : `It is near the top of the ${baseSize} range, so with your ${preferenceLabel} preference ${size} is recommended for a roomier fit (${baseSize} is the regular choice).`,
+    );
+  } else {
+    if (decidingLoc.side === 'above') sentences.push(`It is above the ${size} range, so ${size} may feel tight.`);
+    else if (decidingLoc.side === 'below') sentences.push(`It is below the ${size} range, so ${size} may feel loose.`);
+    else if (fit === 'slightly-tight') sentences.push(`It is near the top of the ${size} range, so the fit may be slightly tight.`);
+    else if (fit === 'slightly-loose' && decidingLoc.band === 'low') sentences.push(`It is near the bottom of the ${size} range, so the fit may be slightly loose.`);
+    if (alternativeSize) sentences.push(`You are at the boundary with ${alternativeSize}; consider trying both.`);
+    if (fitPreference !== 'regular') {
+      sentences.push(
+        fitPreference === 'slim'
+          ? `Your ${preferenceLabel} preference keeps ${size}: your measurements are not close enough to the smaller size for it to fit.`
+          : `Your ${preferenceLabel} preference keeps ${size}: your measurements sit comfortably within it${finalIndex === SIZE_LABELS.length - 1 ? '' : ', so a larger size would be too loose'}.`,
+      );
+    }
+  }
   sentences.push(...notes);
   if (basedOnUncertain) {
     const names = used.filter((u) => u.status === 'uncertain').map((u) => u.label.toLowerCase());
     sentences.push(`Based on an uncertain estimate (${names.join(', ')}); check with a tape measure before buying.`);
   }
 
-  return result({ ...common, status: 'recommended', size, fit, alternativeSize, reason: sentences.join(' ') });
+  return result({ ...common, status: 'recommended', size, fit, alternativeSize, preferenceAdjustment, reason: sentences.join(' ') });
 }
 
 export const FIT_LABELS: Record<FitStatus, string> = {

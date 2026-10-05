@@ -69,10 +69,19 @@ export interface FitDefinition {
 }
 
 export const FIT_DEFINITIONS: Record<FitPreference, FitDefinition> = {
-  slim: { value: 'slim', label: 'Slim', description: 'Closer to the body with a tapered line.' },
-  regular: { value: 'regular', label: 'Regular', description: 'Classic cut with comfortable ease.' },
-  relaxed: { value: 'relaxed', label: 'Relaxed / Oversized', description: 'Roomier, looser silhouette.' },
+  slim: { value: 'slim', label: 'Slim Fit', description: 'Closer to the body. Picks the smaller size when you are right at a size boundary.' },
+  regular: { value: 'regular', label: 'Regular Fit', description: 'Classic, comfortable ease. The size your measurements fall in.' },
+  relaxed: { value: 'relaxed', label: 'Relaxed Fit', description: 'Roomier. Picks the larger size when you are near the top of a size.' },
 };
+
+/** Fit preference used until the user picks another one (and for data saved before preferences existed). */
+export const DEFAULT_FIT_PREFERENCE: FitPreference = 'regular';
+
+export const FIT_PREFERENCES: readonly FitPreference[] = ['slim', 'regular', 'relaxed'];
+
+export function isFitPreference(value: unknown): value is FitPreference {
+  return (FIT_PREFERENCES as readonly unknown[]).includes(value);
+}
 
 export function getClothingItem(type: ClothingType): ClothingItemDefinition {
   const item = CLOTHING_ITEMS.find((candidate) => candidate.type === type);
@@ -82,6 +91,13 @@ export function getClothingItem(type: ClothingType): ClothingItemDefinition {
 
 export function fitsFor(type: ClothingType | null): FitPreference[] {
   return type ? getClothingItem(type).fits : [];
+}
+
+/** The fit to preselect for a clothing type: the current one if it still applies, else the default (Regular). */
+export function defaultFitFor(type: ClothingType, current: FitPreference | null): FitPreference | null {
+  const fits = fitsFor(type);
+  if (current && fits.includes(current)) return current;
+  return fits.includes(DEFAULT_FIT_PREFERENCE) ? DEFAULT_FIT_PREFERENCE : (fits[0] ?? null);
 }
 
 /** Keeps the fit only if it still applies to the newly selected clothing type. */

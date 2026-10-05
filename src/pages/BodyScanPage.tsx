@@ -210,7 +210,7 @@ export function BodyScanPage() {
   const voice = useVoiceGuidance(guidance, voiceGuidance && cameraActive);
 
   const clothingLabel = clothing
-    ? `${getClothingItem(clothing.type).label}${clothing.fit ? ` · ${FIT_DEFINITIONS[clothing.fit].label} fit` : ''}`
+    ? `${getClothingItem(clothing.type).label}${clothing.fit ? ` · ${FIT_DEFINITIONS[clothing.fit].label}` : ''}`
     : null;
 
   // Scan finished: run the measurement engine on the captured views and open the review.
