@@ -5,9 +5,11 @@ import { makeSilhouetteCaptures } from '../measurement/testFixtures';
 import { BODY } from '../silhouette/testBody';
 import { compareAttempt, predictionError } from './compare';
 import { assertExportSafe, buildExport, csvCell, CSV_COLUMNS, SYNTHETIC_NOTICE, toValidationCsv, toValidationJson } from './export';
-import { buildScanAttempt, measureForValidation, recordAnny, recordEllipse } from './fromScan';
+import { browserSummary } from './browser';
+import { buildScanAttempt, firstToLastViewMs, measureForValidation, recordAnny, recordEllipse, scanUsability } from './fromScan';
+import { useValidationStore } from '../../store/validationStore';
 import { emptyGroundTruthDraft, parseGroundTruthDraft, validateGroundTruth, type GroundTruthDraft } from './groundTruth';
-import { summarizeErrors, summarizeValidation } from './metrics';
+import { annyReliability, summarizeErrors, summarizeValidation } from './metrics';
 import { subjectRepeatability } from './repeatability';
 import {
   SYNTHETIC_ATTEMPT_1,
@@ -16,6 +18,7 @@ import {
   SYNTHETIC_LABEL,
   syntheticAttempt,
   syntheticSubject,
+  syntheticUnusableAttempt,
 } from './syntheticFixture';
 
 // All subject data below is SYNTHETIC (tests only) and says nothing about real-person accuracy.
@@ -39,6 +42,7 @@ describe('ground truth (manual tape measurements)', () => {
         { name: 'chest', value: 98.5, unit: 'cm', notes: 'over T-shirt' },
         { name: 'waist', value: 81.2, unit: 'cm' },
       ],
+      sides: {},
     });
   });
 
@@ -133,16 +137,20 @@ describe('summary metrics', () => {
   it('computes metrics separately for ellipse and Anny and for each measurement', () => {
     const summary = summarizeValidation([syntheticSubject([SYNTHETIC_ATTEMPT_1, SYNTHETIC_ATTEMPT_2])]);
     // Ellipse: per attempt 6 valid (thigh unavailable; leg length not taped → counts as neither).
-    expect(summary.ellipse.overall.count).toBe(12);
-    expect(summary.ellipse.overall.unavailable).toBe(2);
+    // Circumferences and lengths are pooled separately — never one combined figure.
+    expect(summary.ellipse.byGroup.circumference).toMatchObject({ count: 6, unavailable: 2, maeCm: 2, maxAbsCm: 4 });
+    expect(summary.ellipse.byGroup.circumference.biasCm).toBeCloseTo(4 / 6, 10);
+    expect(summary.ellipse.byGroup.length).toMatchObject({ count: 6, unavailable: 0, maeCm: 2, biasCm: 0, maxAbsCm: 3 });
+    expect(summary).not.toHaveProperty('ellipse.overall');
     expect(summary.ellipse.byMeasurement.chest).toMatchObject({ count: 2, maeCm: 3, biasCm: 3, medianAbsCm: 3, maxAbsCm: 4 });
     expect(summary.ellipse.byMeasurement.thigh).toMatchObject({ count: 0, unavailable: 2, maeCm: null });
     expect(summary.ellipse.byMeasurement['leg-length']).toMatchObject({ count: 0, unavailable: 0 });
     // Anny: attempt 1 all 7 taped available (errors −2 +1 −1 −1 −1 0 +1), attempt 2 fit rejected.
-    expect(summary.anny.overall).toMatchObject({ count: 7, unavailable: 7, maeCm: 1, medianAbsCm: 1, maxAbsCm: 2 });
-    expect(summary.anny.overall.biasCm).toBeCloseTo(-3 / 7, 10);
+    expect(summary.anny.byGroup.circumference).toMatchObject({ count: 4, unavailable: 4, maeCm: 1.25, biasCm: -0.75, maxAbsCm: 2 });
+    expect(summary.anny.byGroup.length).toMatchObject({ count: 3, unavailable: 3, maeCm: 2 / 3, biasCm: 0, medianAbsCm: 1 });
     expect(summary.includesSynthetic).toBe(true);
-    expect(summary.attempts).toBe(2);
+    expect(summary.usableAttempts).toBe(2);
+    expect(summary.unusableAttempts).toBe(0);
   });
 });
 
@@ -169,6 +177,25 @@ describe('repeatability', () => {
   });
 });
 
+const META = {
+  clothingType: 'activewear',
+  clothingFit: 'fitted',
+  deviceType: 'phone',
+  cameraType: 'rear',
+  lighting: 'dim',
+  browser: 'Chrome 129 · Android',
+} as const;
+const PERFORMANCE = {
+  scanDurationMs: null,
+  firstToLastViewMs: null,
+  meanDetectionsPerSecond: null,
+  minDetectionsPerSecond: null,
+  meanInferenceMs: null,
+  scanCompletedNormally: 'not-recorded',
+  cameraResponsive: 'not-recorded',
+  browserSlowOrFroze: 'not-recorded',
+} as const;
+
 describe('scan → validation attempt', () => {
   const captures = makeSilhouetteCaptures();
   const unavailable: AnnyShadowState = { status: 'unavailable', reason: 'not enough views' };
@@ -176,11 +203,15 @@ describe('scan → validation attempt', () => {
   it('records the production engine on the full body and keeps only numbers', () => {
     const report = measureForValidation(captures, BODY.statureCm);
     const attempt = buildScanAttempt({
-      meta: { attempt: 1, clothingType: 'activewear', clothingFit: 'fitted', deviceType: 'phone', cameraType: 'rear', lighting: 'dim' },
-      report,
+      meta: { ...META, attempt: 1 },
+      measure: () => report,
       annyShadow: unavailable,
       captures,
+      scanStatus: 'finished',
+      finishedEarly: false,
       enteredHeightCm: BODY.statureCm,
+      tapeHeightCm: BODY.statureCm,
+      performance: PERFORMANCE,
       now: new Date('2026-02-01T10:00:00Z'),
     });
     const chest = report.measurements.find((m) => m.id === 'chest')!;
@@ -189,8 +220,9 @@ describe('scan → validation attempt', () => {
     expect(attempt.timestamp).toBe('2026-02-01T10:00:00.000Z');
     for (const p of Object.values(attempt.anny)) expect(p).toMatchObject({ valueCm: null, status: 'unavailable' });
     expect(attempt.annyInfo).toMatchObject({ status: 'unavailable', reason: 'not enough views' });
+    expect(attempt).toMatchObject({ usable: true, scanStatus: 'finished', browser: 'Chrome 129 · Android' });
     expect(() => assertExportSafe(attempt)).not.toThrow();
-    expect(JSON.stringify(attempt)).not.toMatch(/landmark|silhouette|rows/i);
+    expect(JSON.stringify(attempt)).not.toMatch(/landmark|silhouette|"rows"/i);
   });
 
   it('does not turn missing or model-unit engine values into numbers', () => {
@@ -223,6 +255,8 @@ describe('scan → validation attempt', () => {
       heightErrorCm: -0.4,
       iterations: 5,
       workerMs: 151,
+      modelLoadMs: 100,
+      fitMs: 50,
       viewsUsed: ['front', 'left'],
     });
     expect(Object.values(predictions).every((p) => p.valueCm === null)).toBe(true);
@@ -246,7 +280,13 @@ describe('export (JSON / CSV)', () => {
     expect(chest).toMatchObject({ tapeCm: 100, ellipse: { predictedCm: 104, absErrorCm: 4, signedErrorCm: 4, percentError: 4 } });
     const thigh = json.subjects[0].attempts[0].comparisons.find((c: { measurement: string }) => c.measurement === 'thigh');
     expect(thigh.ellipse).toMatchObject({ predictedCm: null, unavailable: true, absErrorCm: null });
-    expect(json.summary.ellipse.overall).toMatchObject({ validComparisons: 12, unavailable: 2 });
+    expect(json.summary.ellipse.byGroup.circumference).toMatchObject({ validComparisons: 6, unavailable: 2 });
+    expect(json.summary.ellipse.byGroup.length).toMatchObject({ validComparisons: 6, unavailable: 0 });
+    expect(json.summary.annyReliability).toMatchObject({ scans: 2, ok: 1, unavailable: 1, rejectionRate: 0.5 });
+    expect(json.notice).toContain('REAL-WORLD VALIDATION — EXPERIMENTAL');
+    expect(json.notice).toContain('These results do not yet establish production clothing-size accuracy.');
+    expect(json.subjects[0].attempts[0]).toMatchObject({ usable: true, performance: { scanDurationMs: 60000 } });
+    expect(json.subjects[0].sides).toEqual({ thigh: 'right', armLength: 'right' });
     expect(json.repeatability[0].pairs[0]).toMatchObject({ baselineAttempt: 1, repeatAttempt: 2 });
   });
 
@@ -301,5 +341,146 @@ describe('privacy', () => {
     const json = JSON.parse(toValidationJson([real]));
     expect(json.synthetic).toBe(false);
     expect(json.syntheticNotice).toBeUndefined();
+  });
+});
+
+describe('Step 9E-3B: protocol rules', () => {
+  it('requires the side for thigh and arm length, and the method notes for shoulder width and leg length', () => {
+    const parsed = parseGroundTruthDraft(draft({ values: { thigh: '55', 'arm-length': '60', 'shoulder-width': '40', 'leg-length': '90' } }));
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(Object.keys(parsed.errors).sort()).toEqual(['arm-length-side', 'leg-length-notes', 'shoulder-width-notes', 'thigh-side']);
+    const ok = parseGroundTruthDraft(
+      draft({
+        values: { thigh: '55', 'arm-length': '60', 'shoulder-width': '40', 'leg-length': '90' },
+        sides: { thigh: 'left', 'arm-length': 'right' },
+        notes: { 'shoulder-width': 'acromion to acromion', 'leg-length': 'trochanter to malleolus' },
+      }),
+    );
+    expect(ok.ok && ok.sides).toEqual({ thigh: 'left', 'arm-length': 'right' });
+  });
+
+  it('fixes the ground truth once a scan is recorded and never overwrites attempts', () => {
+    const store = useValidationStore.getState();
+    store.clearAll();
+    const subject = { subjectId: 'P-001', heightCm: 175, groundTruth: [{ name: 'chest' as const, value: 96, unit: 'cm' as const }], sides: {} };
+    expect(store.saveSubject(subject)).toBe(true);
+    expect(store.saveSubject({ ...subject, heightCm: 176 })).toBe(true); // no scans yet: correction allowed
+    expect(useValidationStore.getState().addAttempt('P-001', SYNTHETIC_ATTEMPT_1)).toBe(true);
+    expect(useValidationStore.getState().addAttempt('P-001', SYNTHETIC_ATTEMPT_3)).toBe(true);
+    expect(useValidationStore.getState().addAttempt('P-001', { ...SYNTHETIC_ATTEMPT_1, usable: false })).toBe(false);
+    expect(useValidationStore.getState().saveSubject({ ...subject, groundTruth: [{ name: 'chest', value: 90, unit: 'cm' }] })).toBe(false);
+    const saved = useValidationStore.getState().subjects[0];
+    expect(saved.groundTruth[0].value).toBe(96);
+    expect(saved.attempts.map((a) => a.attempt)).toEqual([1, 3]);
+    expect(saved.attempts[0].usable).toBe(true);
+    store.clearAll();
+  });
+});
+
+describe('Step 9E-3B: unusable scans', () => {
+  it('decides usability: unfinished scan, missing or mismatched height, tester verdict', () => {
+    const base = { scanStatus: 'finished' as const, viewsCaptured: 8, enteredHeightCm: 175, tapeHeightCm: 175 };
+    expect(scanUsability(base)).toEqual({ usable: true });
+    expect(scanUsability({ ...base, scanStatus: 'scanning', viewsCaptured: 3 })).toEqual({
+      usable: false,
+      reason: 'scan not finished (3 of 8 views captured)',
+    });
+    expect(scanUsability({ ...base, enteredHeightCm: null })).toMatchObject({ usable: false, reason: 'no height entered in the app' });
+    expect(scanUsability({ ...base, enteredHeightCm: 172 })).toMatchObject({ usable: false, reason: expect.stringMatching(/differs from the tape height/) });
+    expect(scanUsability({ ...base, enteredHeightCm: 175.8 })).toEqual({ usable: true });
+    expect(scanUsability({ ...base, testerReason: 'second person in view' })).toMatchObject({
+      usable: false,
+      reason: 'marked unusable by the tester: second person in view',
+    });
+  });
+
+  it('records an unusable scan without measuring it — no values from either engine', () => {
+    const captures = makeSilhouetteCaptures();
+    let measured = false;
+    const done: AnnyShadowState = {
+      status: 'done',
+      loadMs: 10,
+      fitMs: 5,
+      modelBytes: 1,
+      result: { status: 'ok', confidence: 'experimental', measurements: [], fit: { iterations: 4, converged: true, rmsResidualCm: 0.5, heightErrorCm: 0, rowsUsed: 9, viewsUsed: ['front'] } },
+    };
+    const attempt = buildScanAttempt({
+      meta: { ...META, attempt: 2 },
+      measure: () => {
+        measured = true;
+        return measureForValidation(captures, 175);
+      },
+      annyShadow: done,
+      captures,
+      scanStatus: 'finished',
+      finishedEarly: false,
+      enteredHeightCm: 170,
+      tapeHeightCm: 175,
+      performance: PERFORMANCE,
+    });
+    expect(measured).toBe(false);
+    expect(attempt.usable).toBe(false);
+    expect(attempt.unusableReason).toMatch(/differs from the tape height/);
+    for (const p of [...Object.values(attempt.ellipse), ...Object.values(attempt.anny)]) expect(p.valueCm).toBeNull();
+  });
+
+  it('an unfinished scan never uses an Anny result', () => {
+    const attempt = buildScanAttempt({
+      meta: { ...META, attempt: 1 },
+      measure: () => measureForValidation({}, 175),
+      annyShadow: { status: 'unavailable', reason: 'x' },
+      captures: {},
+      scanStatus: 'paused',
+      finishedEarly: false,
+      enteredHeightCm: 175,
+      tapeHeightCm: 175,
+      performance: PERFORMANCE,
+    });
+    expect(attempt).toMatchObject({ usable: false, scanStatus: 'paused', annyInfo: { status: 'not-run' } });
+  });
+
+  it('leaves unusable scans out of metrics and repeatability, but counts them', () => {
+    const subject = syntheticSubject([SYNTHETIC_ATTEMPT_1, syntheticUnusableAttempt(2), SYNTHETIC_ATTEMPT_3]);
+    const summary = summarizeValidation([subject]);
+    expect(summary).toMatchObject({ usableAttempts: 2, unusableAttempts: 1, subjectsWithUsableScans: 1 });
+    const onlyUsable = summarizeValidation([syntheticSubject([SYNTHETIC_ATTEMPT_1, SYNTHETIC_ATTEMPT_3])]);
+    expect(summary.ellipse).toEqual(onlyUsable.ellipse);
+    const rep = subjectRepeatability(subject)!;
+    expect(rep.pairs.map((p) => p.repeatAttempt)).toEqual([3]);
+    expect(subjectRepeatability(syntheticSubject([SYNTHETIC_ATTEMPT_1, syntheticUnusableAttempt(2)]))).toBeNull();
+    const csv = toValidationCsv([subject]);
+    expect(csv).toContain('SYNTHETIC: scan not finished');
+  });
+});
+
+describe('Step 9E-3B: Anny reliability and device info', () => {
+  it('reports availability, rejection reasons, fit and height error, worker time over usable scans', () => {
+    const r = annyReliability([syntheticSubject([SYNTHETIC_ATTEMPT_1, SYNTHETIC_ATTEMPT_2, syntheticUnusableAttempt(4)])]);
+    expect(r).toMatchObject({ scans: 2, ok: 1, unavailable: 1, error: 0, notRun: 0, rejectionRate: 0.5, meanWorkerMs: 120 });
+    expect(r.reasons).toEqual([{ reason: `${SYNTHETIC_LABEL}: fit rejected`, count: 1 }]);
+    expect(r.meanFitErrorCm).toBeCloseTo((0.8 + 3.5) / 2, 10);
+    expect(r.meanAbsHeightErrorCm).toBeCloseTo((0.2 + 2.4) / 2, 10);
+    expect(annyReliability([]).rejectionRate).toBeNull();
+  });
+
+  it('summarizes the browser from the user agent (never the full string)', () => {
+    expect(
+      browserSummary('Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36'),
+    ).toBe('Chrome 129 · Android');
+    expect(
+      browserSummary('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'),
+    ).toBe('Safari 17 · iOS');
+    expect(browserSummary('Mozilla/5.0 (Linux; Android 14; SM-S911B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0 Mobile Safari/537.36')).toBe(
+      'Samsung Internet 25 · Android',
+    );
+    expect(browserSummary('')).toBe('unknown browser · unknown platform');
+  });
+
+  it('measures first → last view time from capture timestamps', () => {
+    const captures = makeSilhouetteCaptures();
+    const times = Object.values(captures).map((c) => c!.capturedAt);
+    expect(firstToLastViewMs(captures)).toBe(Math.max(...times) - Math.min(...times));
+    expect(firstToLastViewMs({})).toBeNull();
   });
 });

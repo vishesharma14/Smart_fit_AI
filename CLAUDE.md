@@ -38,7 +38,8 @@ Completed steps: 1 (application foundation), 2 (Welcome page), 3 (User Informati
 4 (Clothing Selection), 5 (Body Scan foundation), Phase A (real on-device pose detection),
 clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement engine),
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
-9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only).
+9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
+no real-person data collected yet).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -134,6 +135,17 @@ each later scan, as differences — never ground truth), `export.ts` (JSON/CSV b
 `assertExportSafe` rejects landmark/outline/mask/frame/image fields, binary data and data URLs; CSV cells are
 formula-escaped). Records live in `store/validationStore.ts` (memory only, not persisted). `syntheticFixture.ts` is
 SYNTHETIC test data for tests only. No accuracy claims: nothing has been validated on real people yet.
+Step 9E-3B (controlled real-person validation, same panel/store): standardized tape protocol + controlled scan procedure
+(`definitions.ts` `protocol`, `HEIGHT_PROTOCOL`, `SCAN_PROCEDURE`; a consistency guide, not an ISO claim); thigh/arm
+side required, shoulder-width/leg-length method notes required; ground truth fixed once a scan is recorded (store
+`saveSubject` refuses changes; attempts never overwritten). Every attempt is recorded, `usable` or not
+(`scanUsability`: unfinished scan, no / mismatched (>1 cm) entered height, or tester's reason) — unusable attempts get
+no values from either engine and are excluded from metrics/repeatability but counted. Metrics are per measurement
+plus circumference vs length pools (no single combined figure); `annyReliability` = availability, rejection rate and
+reasons, fit/height error, worker time. Attempts also keep browser summary (`browser.ts`, never the full UA), optional
+device details, Anny model-load/fit ms and `performance` (scan start→finish, first→last view, pose-model runs/s and
+ms/frame sampled by `useScanPerformance`, tester observations). Labels: "REAL-WORLD VALIDATION — EXPERIMENTAL",
+"These results do not yet establish production clothing-size accuracy." Anny's 2 cm gate and all engines unchanged.
 **No size prediction or size charts exist yet.**
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
@@ -167,7 +179,8 @@ src/
   components/scan/    ScanViewport (camera + states), BodyGuideOverlay (scan frame + one 3D
                       reference mannequin), ScanStatus (+ capture progress), ScanCoverage (360° ring),
                       PoseDebugOverlay / PoseDebugPanel (?poseDebug only)
-  components/scan/validation/  ValidationPanel (?poseDebug only, lazy): tape ground truth, scan records, metrics, export
+  components/scan/validation/  ValidationPanel (?poseDebug only, lazy): protocol, tape ground truth, scan records
+                      (usable/unusable), metrics, repeatability, Anny reliability, export; useScanPerformance
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), lazily loaded React wrapper
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
@@ -196,8 +209,9 @@ src/
                       testBody = synthetic mask incl. angled views (tests only)
   utils/anny/         Anny shadow model (Step 9E-2): format, model, slice, fit, measure, scanInput, shadow,
                       workerProtocol; testModel (tests only)
-  utils/validation/   real-person validation (Step 9E-3A): definitions, groundTruth, compare, metrics,
-                      repeatability, fromScan, export (+ privacy guard); syntheticFixture (tests only)
+  utils/validation/   real-person validation (Steps 9E-3A/B): definitions (+ protocol), groundTruth, compare, metrics
+                      (+ Anny reliability), repeatability, fromScan (+ usability), browser, export (+ privacy guard);
+                      syntheticFixture (tests only)
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),

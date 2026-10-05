@@ -1,7 +1,7 @@
 import type { ValidationMeasurementId, ValidationSubject } from '../../types/validation';
 import type { ValidationSource } from './compare';
 import { VALIDATION_LABELS, VALIDATION_MEASUREMENT_IDS } from './definitions';
-import { median } from './metrics';
+import { mean, median } from './metrics';
 
 /*
  * Repeatability: how much one engine's result changes between scans of the same subject (scan 1 vs scan 2,
@@ -40,9 +40,12 @@ export interface SubjectRepeatability {
   summary: Record<ValidationSource, Record<ValidationMeasurementId, RepeatSummary>>;
 }
 
-/** Compares the first recorded scan (lowest attempt number) with each later one. Null with fewer than 2 scans. */
+/**
+ * Compares the first usable scan (lowest attempt number) with each later usable one. Unusable attempts are skipped.
+ * Null with fewer than 2 usable scans.
+ */
 export function subjectRepeatability(subject: ValidationSubject): SubjectRepeatability | null {
-  const attempts = [...subject.attempts].sort((a, b) => a.attempt - b.attempt);
+  const attempts = subject.attempts.filter((a) => a.usable).sort((a, b) => a.attempt - b.attempt);
   if (attempts.length < 2) return null;
   const [baseline, ...repeats] = attempts;
   const diff = (source: ValidationSource, repeat: (typeof attempts)[number]): RepeatDifference[] =>
@@ -74,7 +77,7 @@ export function subjectRepeatability(subject: ValidationSubject): SubjectRepeata
           id,
           {
             count: abs.length,
-            meanAbsDifferenceCm: abs.length ? abs.reduce((s, v) => s + v, 0) / abs.length : null,
+            meanAbsDifferenceCm: mean(abs),
             medianAbsDifferenceCm: median(abs),
             maxAbsDifferenceCm: abs.length ? Math.max(...abs) : null,
           },

@@ -26,10 +26,26 @@ afterEach(cleanup);
 
 const type = (label: RegExp | string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
+type PanelProps = Parameters<typeof ValidationPanel>[0];
+const panel = (props: Partial<PanelProps> = {}) => (
+  <ValidationPanel
+    scanStatus="finished"
+    finishedEarly={false}
+    captures={captures}
+    userHeightCm={175}
+    annyShadow={{ status: 'unavailable', reason: 'test' }}
+    poseStats={null}
+    {...props}
+  />
+);
 function renderPanel(scanFinished = true) {
-  return render(
-    <ValidationPanel scanFinished={scanFinished} captures={captures} userHeightCm={175} annyShadow={{ status: 'unavailable', reason: 'test' }} />,
-  );
+  return render(panel(scanFinished ? {} : { scanStatus: 'ready', captures: {} }));
+}
+function saveSubject() {
+  type('Anonymous subject ID', 'P-001');
+  type('Height (cm, tape)', '175');
+  type('Chest (cm)', '96');
+  fireEvent.click(screen.getByRole('button', { name: 'Save subject' }));
 }
 
 describe('ValidationPanel (?poseDebug only)', () => {
@@ -38,6 +54,52 @@ describe('ValidationPanel (?poseDebug only)', () => {
     expect(screen.getByRole('heading', { name: 'Validation mode — experimental' })).toBeTruthy();
     expect(screen.getByText('Ground truth must come from manual tape measurements.')).toBeTruthy();
     expect(screen.getByText('These results are not yet validated for real-world clothing sizing.')).toBeTruthy();
+    expect(screen.getByText('REAL-WORLD VALIDATION — EXPERIMENTAL')).toBeTruthy();
+    expect(screen.getByText('These results do not yet establish production clothing-size accuracy.')).toBeTruthy();
+    // Standardized protocol and procedure.
+    expect(screen.getByText('Measurement protocol (centimetres)')).toBeTruthy();
+    expect(screen.getByText('Do not suck in the stomach.')).toBeTruthy();
+    expect(screen.getByText(/consistency guide, not a claim/)).toBeTruthy();
+    expect(screen.getByText('Controlled scan procedure')).toBeTruthy();
+  });
+
+  it('records an unfinished scan as an unusable attempt with its reason, without values', () => {
+    render(panel({ scanStatus: 'scanning', captures: { front: captures.front } }));
+    saveSubject();
+    expect(screen.getByText(/Will be recorded as unusable: scan not finished \(1 of 8 views captured\)/)).toBeTruthy();
+    act(() => fireEvent.click(screen.getByRole('button', { name: 'Record as unusable attempt' })));
+    const [attempt] = useValidationStore.getState().subjects[0].attempts;
+    expect(attempt).toMatchObject({ usable: false, unusableReason: 'scan not finished (1 of 8 views captured)', scanStatus: 'scanning' });
+    expect(Object.values(attempt.ellipse).every((p) => p.valueCm === null)).toBe(true);
+    expect(screen.getByRole('table', { name: 'All recorded scans' }).textContent).toContain('no — scan not finished');
+  });
+
+  it('records repeated scans against the same, locked ground truth and shows repeatability', () => {
+    const { rerender } = render(panel());
+    saveSubject();
+    act(() => fireEvent.click(screen.getByRole('button', { name: 'Record this scan' })));
+    // Tape values are now fixed.
+    expect(screen.getByText(/Tape values are fixed/)).toBeTruthy();
+    expect(screen.getByLabelText('Chest (cm)').closest('fieldset')!.disabled).toBe(true);
+    expect(screen.getByText(/Needs at least two usable scans/)).toBeTruthy();
+    // A second, independent scan (new captures from a restarted scan).
+    rerender(panel({ captures: makeSilhouetteCaptures() }));
+    act(() => fireEvent.click(screen.getByRole('button', { name: 'Record this scan' })));
+    const subject = useValidationStore.getState().subjects[0];
+    expect(subject.attempts.map((a) => a.attempt)).toEqual([1, 2]);
+    expect(screen.getByRole('table', { name: 'Repeatability summary' })).toBeTruthy();
+    // Summary keeps circumferences and lengths apart.
+    expect(screen.getAllByText('Circumferences (pooled)').length).toBe(2);
+    expect(screen.getAllByText('Lengths (pooled)').length).toBe(2);
+    expect(screen.queryByText(/^All$/)).toBeNull();
+  });
+
+  it('records a height mismatch as unusable', () => {
+    render(panel({ userHeightCm: 170 }));
+    saveSubject();
+    expect(screen.getByText(/differs from the tape height/)).toBeTruthy();
+    act(() => fireEvent.click(screen.getByRole('button', { name: 'Record as unusable attempt' })));
+    expect(useValidationStore.getState().subjects[0].attempts[0].usable).toBe(false);
   });
 
   it('validates the subject form and keeps records in memory only', () => {
@@ -78,7 +140,7 @@ describe('ValidationPanel (?poseDebug only)', () => {
     expect((screen.getByRole('button', { name: 'Record this scan' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/already recorded/)).toBeTruthy();
 
-    const table = screen.getByRole('table', { name: '' });
+    const table = screen.getByRole('table', { name: 'Scan 1 comparison' });
     const chestRow = within(table).getByRole('row', { name: /^Chest/ });
     expect(within(chestRow).getByText('96.0')).toBeTruthy();
     expect(within(chestRow).getAllByText('unavailable')).toHaveLength(1); // Anny unavailable
@@ -93,7 +155,7 @@ describe('ValidationPanel (?poseDebug only)', () => {
     type('Chest (cm)', '96');
     fireEvent.click(screen.getByRole('button', { name: 'Save subject' }));
     expect((screen.getByRole('button', { name: 'Record this scan' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText('Finish the 360° scan first.')).toBeTruthy();
+    expect(screen.getByText('Start the 360° scan first.')).toBeTruthy();
   });
 });
 

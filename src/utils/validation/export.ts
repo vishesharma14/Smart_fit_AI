@@ -1,6 +1,7 @@
 import type { ValidationSubject } from '../../types/validation';
 import { compareAttempt, VALIDATION_SOURCES, type MeasurementComparison } from './compare';
-import { summarizeValidation, type ValidationSummary } from './metrics';
+import { VALIDATION_GROUP } from './definitions';
+import { annyReliability, summarizeValidation, type ErrorSummary, type ValidationSummary } from './metrics';
 import { subjectRepeatability, type SubjectRepeatability } from './repeatability';
 
 /*
@@ -12,8 +13,9 @@ import { subjectRepeatability, type SubjectRepeatability } from './repeatability
  */
 
 export const EXPORT_FORMAT = 'sizerai-validation-v1';
-export const EXPORT_NOTICE =
-  'Validation mode — experimental. Ground truth must come from manual tape measurements. These results are not yet validated for real-world clothing sizing. Contains measurement values and metrics only.';
+export const REAL_WORLD_LABEL = 'REAL-WORLD VALIDATION — EXPERIMENTAL';
+export const ACCURACY_DISCLAIMER = 'These results do not yet establish production clothing-size accuracy.';
+export const EXPORT_NOTICE = `${REAL_WORLD_LABEL}. Ground truth must come from manual tape measurements. These results are not yet validated for real-world clothing sizing. ${ACCURACY_DISCLAIMER} Contains measurement values and metrics only.`;
 export const SYNTHETIC_NOTICE = 'Contains SYNTHETIC test data. Synthetic results do not represent real-person accuracy.';
 
 /** Keys that could carry camera or body-image data. */
@@ -57,11 +59,17 @@ function exportComparison(row: MeasurementComparison) {
     signedErrorCm: r2(s.error?.signedCm),
     percentError: r2(s.error?.percent),
   });
-  return { measurement: row.id, tapeCm: r2(row.truthCm), ellipse: source(row.ellipse), anny: source(row.anny) };
+  return {
+    measurement: row.id,
+    group: VALIDATION_GROUP[row.id],
+    tapeCm: r2(row.truthCm),
+    ellipse: source(row.ellipse),
+    anny: source(row.anny),
+  };
 }
 
 function exportSummary(summary: ValidationSummary) {
-  const round = (s: ValidationSummary['ellipse']['overall']) => ({
+  const round = (s: ErrorSummary) => ({
     validComparisons: s.count,
     unavailable: s.unavailable,
     maeCm: r2(s.maeCm),
@@ -73,7 +81,7 @@ function exportSummary(summary: ValidationSummary) {
     VALIDATION_SOURCES.map((source) => [
       source,
       {
-        overall: round(summary[source].overall),
+        byGroup: Object.fromEntries(Object.entries(summary[source].byGroup).map(([group, s]) => [group, round(s)])),
         byMeasurement: Object.fromEntries(Object.entries(summary[source].byMeasurement).map(([id, s]) => [id, round(s)])),
       },
     ]),
@@ -110,10 +118,27 @@ export function buildExport(subjects: readonly ValidationSubject[], now = new Da
       subjectId: subject.subjectId,
       synthetic: subject.synthetic,
       heightCm: r2(subject.heightCm),
+      sides: { thigh: subject.sides.thigh ?? null, armLength: subject.sides['arm-length'] ?? null },
       groundTruth: subject.groundTruth.map((t) => ({ name: t.name, value: r2(t.value), unit: t.unit, notes: t.notes ?? null })),
       attempts: subject.attempts.map((a) => ({
         attempt: a.attempt,
         timestamp: a.timestamp,
+        usable: a.usable,
+        unusableReason: a.unusableReason ?? null,
+        scanStatus: a.scanStatus,
+        finishedEarly: a.finishedEarly,
+        browser: a.browser,
+        deviceDetails: a.deviceDetails ?? null,
+        performance: {
+          scanDurationMs: r2(a.performance.scanDurationMs),
+          firstToLastViewMs: r2(a.performance.firstToLastViewMs),
+          meanDetectionsPerSecond: r2(a.performance.meanDetectionsPerSecond),
+          minDetectionsPerSecond: r2(a.performance.minDetectionsPerSecond),
+          meanInferenceMs: r2(a.performance.meanInferenceMs),
+          scanCompletedNormally: a.performance.scanCompletedNormally,
+          cameraResponsive: a.performance.cameraResponsive,
+          browserSlowOrFroze: a.performance.browserSlowOrFroze,
+        },
         clothingType: a.clothingType,
         clothingFit: a.clothingFit,
         deviceType: a.deviceType,
@@ -129,12 +154,38 @@ export function buildExport(subjects: readonly ValidationSubject[], now = new Da
           heightErrorCm: r2(a.annyInfo.heightErrorCm),
           iterations: a.annyInfo.iterations,
           workerMs: a.annyInfo.workerMs,
+          modelLoadMs: a.annyInfo.modelLoadMs,
+          fitMs: a.annyInfo.fitMs,
           viewsUsed: [...a.annyInfo.viewsUsed],
         },
         comparisons: compareAttempt(subject, a).map(exportComparison),
       })),
     })),
-    summary: exportSummary(summarizeValidation(subjects)),
+    summary: (() => {
+      const summary = summarizeValidation(subjects);
+      const anny = annyReliability(subjects);
+      return {
+        subjects: summary.subjects,
+        subjectsWithUsableScans: summary.subjectsWithUsableScans,
+        usableAttempts: summary.usableAttempts,
+        unusableAttempts: summary.unusableAttempts,
+        note: 'Circumferences and lengths are summarized separately; there is no single combined accuracy figure.',
+        ...exportSummary(summary),
+        annyReliability: {
+          scans: anny.scans,
+          ok: anny.ok,
+          unavailable: anny.unavailable,
+          error: anny.error,
+          notRun: anny.notRun,
+          rejectionRate: r2(anny.rejectionRate),
+          reasons: anny.reasons,
+          meanFitErrorCm: r2(anny.meanFitErrorCm),
+          meanAbsHeightErrorCm: r2(anny.meanAbsHeightErrorCm),
+          meanWorkerMs: r2(anny.meanWorkerMs),
+          note: 'A passing Anny fit does not mean the measurement is accurate.',
+        },
+      };
+    })(),
     repeatability: subjects.flatMap((s) => {
       const rep = subjectRepeatability(s);
       return rep ? [exportRepeatability(rep)] : [];
@@ -153,7 +204,11 @@ export const CSV_COLUMNS = [
   'synthetic',
   'attempt',
   'timestamp',
+  'usable',
+  'unusable_reason',
   'device_type',
+  'device_details',
+  'browser',
   'camera_type',
   'lighting',
   'clothing_type',
@@ -161,8 +216,11 @@ export const CSV_COLUMNS = [
   'height_cm',
   'entered_height_cm',
   'views_captured',
+  'scan_duration_ms',
   'measurement',
+  'measurement_group',
   'tape_cm',
+  'tape_side',
   'tape_notes',
   'ellipse_cm',
   'ellipse_status',
@@ -179,6 +237,8 @@ export const CSV_COLUMNS = [
   'anny_fit_error_cm',
   'anny_height_error_cm',
   'anny_worker_ms',
+  'anny_model_load_ms',
+  'anny_fit_ms',
 ] as const;
 
 /** One CSV cell: quoted when needed; text that a spreadsheet would run as a formula is prefixed with '. */
@@ -203,7 +263,11 @@ export function toValidationCsv(subjects: readonly ValidationSubject[], now = ne
           subject.synthetic,
           a.attempt,
           a.timestamp,
+          a.usable,
+          a.unusableReason,
           a.deviceType,
+          a.deviceDetails,
+          a.browser,
           a.cameraType,
           a.lighting,
           a.clothingType,
@@ -211,8 +275,11 @@ export function toValidationCsv(subjects: readonly ValidationSubject[], now = ne
           subject.heightCm,
           a.enteredHeightCm,
           a.viewsCaptured.join(' '),
+          a.performance.scanDurationMs,
           c.measurement,
+          c.group,
           c.tapeCm,
+          c.measurement === 'thigh' || c.measurement === 'arm-length' ? (source.sides[c.measurement] ?? null) : null,
           notes,
           c.ellipse.predictedCm,
           c.ellipse.status,
@@ -229,6 +296,8 @@ export function toValidationCsv(subjects: readonly ValidationSubject[], now = ne
           a.anny.fitErrorCm,
           a.anny.heightErrorCm,
           a.anny.workerMs,
+          a.anny.modelLoadMs,
+          a.anny.fitMs,
         ];
         lines.push(cells.map(csvCell).join(','));
       }
