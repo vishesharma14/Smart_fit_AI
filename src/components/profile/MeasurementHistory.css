@@ -1,0 +1,234 @@
+/* Measurement History (Step 16): earlier saved results, details and comparison with the latest measurements */
+
+.history-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(18rem 8rem at 0% 0%, rgb(139 92 246 / 0.08), transparent 70%),
+    var(--color-surface);
+}
+
+.history-item__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.history-item__title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.history-item__brand {
+  font-weight: 600;
+  color: var(--color-secondary);
+}
+
+.history-item__date {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.history-item__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.history-item__size {
+  margin: 0 var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.history-item__size strong {
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.history-item__key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.history-item__key div {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+}
+
+.history-item__key dt {
+  color: var(--color-text-muted);
+}
+
+.history-item__key dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.history-item__actions .button {
+  flex: 1 1 11rem;
+}
+
+.history-item__chevron {
+  transition: transform var(--transition-base);
+}
+
+.history-item__chevron[data-open='true'] {
+  transform: rotate(180deg);
+}
+
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.history-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.history-facts dt,
+.history-compare__values dt {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+.history-facts dd {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.history-empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* Comparison rows: name and change on top, previous / latest in two aligned columns below; stacked on phones */
+.history-compare {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-compare__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name change'
+    'values values';
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+
+/* Direction is always written out; the accent only marks rows with a change (no good/bad colours). */
+.history-compare__row[data-change='increase'],
+.history-compare__row[data-change='decrease'] {
+  border-left-color: var(--color-secondary);
+}
+
+.history-compare__name {
+  grid-area: name;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.history-compare__values {
+  grid-area: values;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+}
+
+.history-compare__values dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.history-compare__change {
+  grid-area: change;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.history-compare__row[data-change='no-change'] .history-compare__change {
+  color: var(--color-text-muted);
+}
+
+.history-compare__row[data-change='unavailable'] .history-compare__change {
+  font-weight: 500;
+  color: var(--color-text-subtle);
+}
+
+@media (max-width: 30rem) {
+  .history-compare__row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'name'
+      'values'
+      'change';
+  }
+
+  .history-compare__change {
+    text-align: left;
+  }
+}

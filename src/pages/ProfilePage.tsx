@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ScanLine, ShieldCheck, Trash2 } from 'lucide-react';
 import { Button } from '../components/Button';
+import { MeasurementHistory } from '../components/profile/MeasurementHistory';
 import { MeasurementList } from '../components/results/MeasurementList';
 import { SizeHero } from '../components/results/SizeHero';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -9,12 +10,10 @@ import { FlowStepLayout } from '../layouts/FlowStepLayout';
 import { PATHS } from '../routes/paths';
 import { useAppStore } from '../store/useAppStore';
 import type { FitProfile, ScanRecord } from '../types/profile';
-import { getClothingItem } from '../utils/clothingCatalog';
 import { pageTitle } from '../utils/constants';
 import { fadeUpItem, staggerContainer } from '../utils/motion';
 import { formatSavedDate, startScanPath } from '../utils/profile/format';
 import { REFERENCE_SIZING_NOTE, brandName } from '../utils/sizing/brandCharts';
-import { FIT_LABELS } from '../utils/sizing/recommendSize';
 
 const TITLE_ID = 'profile-title';
 
@@ -74,6 +73,7 @@ export function ProfilePage() {
             </div>
           </motion.section>
         )}
+        {!profile && history.length > 0 && <MeasurementHistory records={history} latest={null} />}
       </motion.div>
     </FlowStepLayout>
   );
@@ -130,26 +130,7 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
         {profile.brand !== 'generic' && <p className="result-card__note">{REFERENCE_SIZING_NOTE}</p>}
       </motion.section>
 
-      <motion.section className="result-card" aria-labelledby="profile-history-title" variants={fadeUpItem}>
-        <h2 id="profile-history-title" className="result-card__title">
-          Previous results
-        </h2>
-        {previous.length > 0 ? (
-          <ul className="result-history">
-            {previous.map((r) => (
-              <li key={r.id} className="result-history__item">
-                <span>
-                  <span className="result-history__size">{r.size}</span> · {getClothingItem(r.garment).label} ·{' '}
-                  {FIT_LABELS[r.fit]}
-                </span>
-                <span className="result-history__date">{formatSavedDate(r.measuredAt)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="result-card__text">No previous results yet. Each new result you save is listed here.</p>
-        )}
-      </motion.section>
+      <MeasurementHistory records={previous} latest={{ measuredAt: profile.measuredAt, measurements: profile.measurements }} />
 
       <motion.div className="result-actions" variants={fadeUpItem}>
         <Button to={scanPath} size="lg">

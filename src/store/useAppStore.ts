@@ -6,7 +6,8 @@ import { createSettingsSlice } from './slices/settingsSlice';
 import { createUserSlice } from './slices/userSlice';
 import type { ThemePreference } from '../types/domain';
 import type { AppState } from './types';
-import { isScanRecord, normalizeFitProfile } from '../utils/profile/fitProfile';
+import { normalizeFitProfile, normalizeScanRecord } from '../utils/profile/fitProfile';
+import type { ScanRecord } from '../types/profile';
 
 /**
  * Global application store, composed from feature slices.
@@ -42,7 +43,9 @@ export const useAppStore = create<AppState>()(
           ...current,
           ...stored,
           fitProfile: normalizeFitProfile(stored.fitProfile),
-          scanHistory: Array.isArray(stored.scanHistory) ? stored.scanHistory.filter(isScanRecord) : [],
+          scanHistory: Array.isArray(stored.scanHistory)
+            ? stored.scanHistory.map(normalizeScanRecord).filter((r): r is ScanRecord => r !== null)
+            : [],
         };
       },
       // v1 stored a single `units` system; map it onto the separate height/weight units.
