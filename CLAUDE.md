@@ -40,12 +40,12 @@ clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement eng
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
 no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
-Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing), 16 (measurement history and comparison).
+Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing), 16 (measurement history and comparison), 17 (Privacy Center).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
 `/measurements` Measurement Review (step 4 of 4) → `/results` Results → `/profile` Fit Profile (after the flow; no step
-progress). Unknown paths → `NotFoundPage` (`*` route). The Welcome page shows "My Fit Profile" once a profile is saved.
+progress) → `/privacy` Privacy Center (from Profile). Unknown paths → `NotFoundPage` (`*` route). The Welcome page shows "My Fit Profile" once a profile is saved.
 `README.md` is the public project description (keep it technically honest when features change). `index.html` sets a
 Content-Security-Policy `connect-src 'self' blob: data:`: the page may only connect to its own origin (blocks MediaPipe's
 built-in usage logging to odml.pa.googleapis.com, which has no opt-out) — keep it when adding features; any new network
@@ -216,6 +216,13 @@ by Delete Profile) now keeps a snapshot per saved result: `ScanRecord` gained op
 saved profile): cards with View Details / Compare with Latest (native buttons, `aria-expanded`/`aria-controls`,
 contextual `aria-label`s) and inline panels; "latest" = the saved `fitProfile` measurements (none → "Save a fit profile
 to compare future measurements."). Historical sizes/brands are shown as saved, never recalculated.
+Privacy Center (Step 17, `pages/PrivacyCenterPage` + `components/privacy/DeleteSavedData`, `PATHS.privacy`): states only
+what the code does — current setup checklist, what is stored (fit profile + history snapshots + display settings, with a
+live "Saved in this browser now" summary), what is not stored, camera processing (incl. the voice-guidance caveat),
+where data lives (localStorage, not encrypted, no backend), and "Delete All Saved Data": a two-step confirmation
+(`alertdialog`, focus to Cancel / back to the button / to the status message) that calls the existing
+`deleteFitProfile` (profile + history only; display settings, in-memory session data and other storage untouched).
+Linked from the Profile actions (both states), the Profile privacy note and the scan page privacy note. Not a legal policy.
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
@@ -255,11 +262,12 @@ src/
   components/results/ SizeHero, MeasurementList, results.css (Results + Profile pages)
   components/scanQuality/  ScanQualityCard (review page)
   components/profile/ MeasurementHistory (Profile page: history cards, details, comparison)
+  components/privacy/ DeleteSavedData + PrivacyCenter.css (Privacy Center page)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), React wrapper (statically imported)
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage,
-                      MeasurementReviewPage, ResultsPage, ProfilePage, NotFoundPage)
+                      MeasurementReviewPage, ResultsPage, ProfilePage, PrivacyCenterPage, NotFoundPage)
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/

@@ -7,6 +7,7 @@ export const PATHS = {
   measurements: '/measurements',
   results: '/results',
   profile: '/profile',
+  privacy: '/privacy',
 } as const;
 
 /** Where the Welcome page's Start button leads. `null` hides navigation and shows the button as unavailable. */

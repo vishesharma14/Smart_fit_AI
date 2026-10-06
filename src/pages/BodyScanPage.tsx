@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import {
   ArrowLeft,
   ArrowRight,
@@ -436,7 +436,7 @@ export function BodyScanPage() {
             lighting, movement, your body pose (joint positions) and your body outline. Video frames and the outline
             image are not uploaded or saved; for each angle only the detected joint positions and the outline’s edge
             positions (numbers) are kept in memory. Measurements are calculated from them on this device, and the camera
-            turns off when you leave this page.
+            turns off when you leave this page. Details in the <Link to={PATHS.privacy}>Privacy Center</Link>.
           </span>
         </motion.p>
       </motion.div>
