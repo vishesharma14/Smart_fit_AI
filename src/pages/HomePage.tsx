@@ -45,9 +45,9 @@ export function HomePage() {
           <motion.div className="welcome__actions" variants={item}>
             {WELCOME_NEXT_PATH ? (
               <>
-                {/* The normal flow always starts outside Demo Mode. */}
+                {/* The real scan flow always starts outside Demo Mode. */}
                 <Button to={WELCOME_NEXT_PATH} size="lg" onClick={exitDemoMode}>
-                  Get Started
+                  Start New Scan
                   <ArrowRight aria-hidden="true" size={20} />
                 </Button>
                 <Button
@@ -75,7 +75,7 @@ export function HomePage() {
             ) : (
               <>
                 <Button size="lg" aria-disabled="true" aria-describedby={START_UNAVAILABLE_NOTE_ID}>
-                  Get Started
+                  Start New Scan
                   <ArrowRight aria-hidden="true" size={20} />
                 </Button>
                 <p id={START_UNAVAILABLE_NOTE_ID} className="welcome__note">

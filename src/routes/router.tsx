@@ -9,6 +9,7 @@ import { NotFoundPage } from '../pages/NotFoundPage';
 import { PrivacyCenterPage } from '../pages/PrivacyCenterPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { ResultsPage } from '../pages/ResultsPage';
+import { RouteErrorPage } from '../pages/RouteErrorPage';
 import { UserInfoPage } from '../pages/UserInfoPage';
 import { PATHS } from './paths';
 
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
   {
     path: PATHS.home,
     element: <RootLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <HomePage /> },
       { path: PATHS.userInfo, element: <UserInfoPage /> },

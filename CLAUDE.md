@@ -40,7 +40,10 @@ clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement eng
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
 no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
-Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing), 16 (measurement history and comparison), 17 (Privacy Center), 18 (Demo Mode).
+Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing), 16 (measurement history and comparison), 17 (Privacy Center), 18 (Demo Mode), 19 (final UX
+polish: consistent action labels — "Start New Scan" for starting the flow, "Scan Again" to repeat, "View Results";
+route-level `RouteErrorPage` (`errorElement`, no stack traces; 404 responses render `NotFoundPage`); Profile "Scan Again"
+stays in the demo while Demo Mode is on).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -225,7 +228,7 @@ where data lives (localStorage, not encrypted, no backend), and "Delete All Save
 Linked from the Profile actions (both states), the Profile privacy note and the scan page privacy note. Not a legal policy.
 Demo Mode (Step 18): `demoMode` in the user slice (memory only, not persisted); `enterDemoMode` (Welcome "Try Demo Mode":
 sample `DEMO_USER_INFO`, clears unsaved scan results) / `exitDemoMode` (banner "Exit Demo Mode", Results "Start Real
-Scan", Welcome "Get Started" and opening `BodyScanPage` all exit; clears the sample details and demo scan results, never
+Scan", Welcome "Start New Scan" and opening `BodyScanPage` all exit; clears the sample details and demo scan results, never
 saved data). `utils/demo/demoData.ts` is the single source of the fictional sample data: `DEMO_MEASUREMENTS_CM`,
 `DEMO_SCAN_QUALITY` (real `ScanQuality` shape, 94 Excellent), `buildDemoScanResult(garment)` = an ordinary
 `ScanMeasurementResult` for the garment's region marked `demo: true` (outline measurements `uncertain`, calibration
@@ -280,7 +283,8 @@ src/
                       scene (renders on demand only), React wrapper (statically imported)
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage,
-                      MeasurementReviewPage, ResultsPage, ProfilePage, PrivacyCenterPage, DemoScanPage, NotFoundPage)
+                      MeasurementReviewPage, ResultsPage, ProfilePage, PrivacyCenterPage, DemoScanPage, NotFoundPage,
+                      RouteErrorPage)
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/

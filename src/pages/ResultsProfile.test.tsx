@@ -92,7 +92,7 @@ describe('ResultsPage', () => {
   it('shows an empty state without confirmed measurements', () => {
     renderAt(PATHS.results);
     expect(screen.getByRole('heading', { name: 'No confirmed measurements yet' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /Start a scan/ }).getAttribute('href')).toBe(PATHS.userInfo);
+    expect(screen.getByRole('link', { name: /Start New Scan/ }).getAttribute('href')).toBe(PATHS.userInfo);
   });
 
   it('saves the fit profile (measurements, size, garment, fit, timestamp) on this device', () => {
@@ -151,11 +151,11 @@ describe('ProfilePage', () => {
   it('shows an empty state with an action to start a scan', () => {
     renderAt(PATHS.profile);
     expect(screen.getByRole('heading', { name: 'No saved fit profile yet' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: /Start a scan/ }).getAttribute('href')).toBe(PATHS.userInfo);
+    expect(screen.getByRole('link', { name: /Start New Scan/ }).getAttribute('href')).toBe(PATHS.userInfo);
     useAppStore.setState({ userInfo: { name: '', gender: null, age: null, heightCm: 175, weightKg: null } });
     cleanup();
     renderAt(PATHS.profile);
-    expect(screen.getByRole('link', { name: /Start a scan/ }).getAttribute('href')).toBe(PATHS.scan);
+    expect(screen.getByRole('link', { name: /Start New Scan/ }).getAttribute('href')).toBe(PATHS.scan);
   });
 
   it('shows the saved size, measurements, last scan date and previous results', () => {

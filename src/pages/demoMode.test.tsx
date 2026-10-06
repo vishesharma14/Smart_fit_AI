@@ -109,6 +109,8 @@ describe('Demo Mode journey', () => {
     expect(within(hero).getByLabelText('Size XL')).toBeTruthy();
     expect(within(hero).getByText(/Based on sample measurements — demonstration only/)).toBeTruthy();
     expect(within(hero).getByText(/Scan quality \(demo sample\): Excellent · 94\/100/)).toBeTruthy();
+    expect(screen.getByText(/Sample measurements from Demo Mode — demonstration only/)).toBeTruthy();
+    expect(screen.queryByText(/Estimates come from your body outline/)).toBeNull();
     // Brand selection still applies (Nike T-shirt XL 112–120 → chest 110 is L).
     fireEvent.click(within(screen.getByRole('group', { name: 'Use reference brand sizing' })).getByRole('radio', { name: 'Nike' }));
     expect(within(screen.getByRole('region', { name: 'T-Shirt' })).getByLabelText('Size L')).toBeTruthy();
@@ -122,6 +124,7 @@ describe('Demo Mode journey', () => {
     expect(within(profileHero).getByText('Saved size · Demo profile')).toBeTruthy();
     expect(within(profileHero).getByText(/Saved from Demo Mode sample data — not a real scan/)).toBeTruthy();
     expect(within(profileHero).getByText('Demo scan')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Scan Again/ }).getAttribute('href')).toBe(PATHS.demoScan);
 
     // Exit Demo Mode from the banner.
     await click(within(banner()!).getByRole('button', { name: /Exit Demo Mode/ }));
@@ -153,9 +156,9 @@ describe('Demo Mode journey', () => {
 });
 
 describe('the normal flow is unaffected', () => {
-  it('Get Started never enters Demo Mode and Clothing still leads to the camera scan', async () => {
+  it('Start New Scan never enters Demo Mode and Clothing still leads to the camera scan', async () => {
     const router = renderApp();
-    await click(screen.getByRole('link', { name: /Get Started/ }));
+    await click(screen.getByRole('link', { name: /Start New Scan/ }));
     expect(useAppStore.getState().demoMode).toBe(false);
     expect(banner()).toBeNull();
     useAppStore.setState({ userInfo: { name: '', gender: 'men', age: 30, heightCm: 175, weightKg: 75 } });
@@ -165,11 +168,11 @@ describe('the normal flow is unaffected', () => {
     expect(router.state.location.pathname).toBe(PATHS.scan);
   });
 
-  it('Get Started from inside Demo Mode leaves it', async () => {
+  it('Start New Scan from inside Demo Mode leaves it', async () => {
     useAppStore.getState().enterDemoMode();
     renderApp();
     expect(banner()).toBeTruthy();
-    await click(screen.getByRole('link', { name: /Get Started/ }));
+    await click(screen.getByRole('link', { name: /Start New Scan/ }));
     expect(useAppStore.getState().demoMode).toBe(false);
     expect(useAppStore.getState().userInfo.name).toBe('');
   });
