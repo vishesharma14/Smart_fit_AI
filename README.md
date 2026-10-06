@@ -18,8 +18,8 @@ chart — an assistive recommendation, not a tailor's measurement.
   reason. You can correct values you know; edits are marked as yours.
 - **Size recommendation**: recommended size (S–XXL), fit (Good Fit / Slightly Tight / Slightly Loose), the
   measurements used, a neighbouring size at a boundary, and a plain-language "Why this size?".
-- **Fit profile**: save your result on this device, see your saved measurements and previous results, scan again or
-  delete it.
+- **Fit profile**: save your result on this device, see your saved measurements and measurement history, scan again
+  or delete it.
 - **Responsive**: designed mobile-first (full-screen scan view on phones and tablets) and for desktop.
 
 ## Technology
@@ -106,14 +106,30 @@ the same fit-preference logic to that brand's chart (`src/utils/sizing/brandChar
   the generic chart is never substituted.
 - A saved fit profile remembers which chart its size came from (older profiles load as Generic).
 
+## Measurement history
+
+Each result you save is also kept in a short history on the Profile page (newest first, at most 10, in this
+browser's local storage — the same storage as the fit profile; no camera images or video). **Measurement History**
+lists earlier results with their date, garment, brand chart, size, fit preference and key measurements, exactly as
+they were saved — they are never recalculated with today's charts or preferences. **View Details** shows the whole
+snapshot; **Compare with Latest** compares it with the measurements in your saved fit profile:
+
+- only the same measurement in both records is compared (chest with chest, never chest with waist); change = latest −
+  previous, shown as an increase or decrease, or "No meaningful change" below 0.5 cm;
+- a measurement missing from either record is shown as unavailable — nothing is estimated;
+- the comparison is descriptive only: it gives no health, fitness or body-composition interpretation.
+
+Results saved before measurement history existed load as before; they show their size and date but have no stored
+measurements to compare.
+
 ## Privacy
 
 - Camera frames, photos, video and segmentation masks are processed in the browser and are **not uploaded or
   saved**. For each captured view only landmark positions and outline edge positions (numbers) are kept, in memory.
 - Your details, scan results and unsaved measurements stay in memory for the session.
 - When you choose **Save Fit Profile**, the profile (garment, size, fit, measurements and dates — numbers only) and a
-  short list of previous results are stored in this browser's local storage on this device, along with display
-  preferences. You can delete the profile from the Profile page. There is no backend and no account.
+  short history of saved results (the same numbers and labels per result) are stored in this browser's local storage on this device, along with display
+  preferences. You can delete the profile and its history from the Profile page. There is no backend and no account.
 - The app and the pose model are served from wherever the app is hosted; the app itself calls no third-party
   services. A Content-Security-Policy (`connect-src 'self' blob: data:` in `index.html`) restricts network
   connections to the app's own origin — this also blocks the usage-statistics logging built into the MediaPipe

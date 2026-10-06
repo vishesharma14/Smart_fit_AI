@@ -18,7 +18,11 @@ export interface SavedMeasurement {
   manuallyEdited: boolean;
 }
 
-/** One saved result: which garment, which size, and the measurements it came from. */
+/**
+ * One saved result in the history: which garment, which size, and (Step 16) a snapshot of how it was sized and the
+ * measurements it came from. The snapshot fields are optional: records saved before Step 16 do not have them, and
+ * they are shown only when present — never filled in or recalculated.
+ */
 export interface ScanRecord {
   /** Stable per scan + garment, so re-saving the same scan updates its entry instead of adding one. */
   id: string;
@@ -29,6 +33,12 @@ export interface ScanRecord {
   measuredAt: string;
   /** When the user saved this result (ISO 8601). */
   savedAt: string;
+  /** Fit preference the size was recommended for (Step 16 snapshot). */
+  fitPreference?: FitPreference;
+  /** Chart the size was recommended on (Step 16 snapshot). */
+  brand?: SizingBrandId;
+  /** The saved measurements (cm) the size came from (Step 16 snapshot). */
+  measurements?: SavedMeasurement[];
 }
 
 export interface FitProfile extends ScanRecord {

@@ -8,7 +8,7 @@ export interface FitSlice {
   prediction: SizePrediction | null;
   /** The user's saved fit profile (Step 11): on this device only, deletable. */
   fitProfile: FitProfile | null;
-  /** Saved results, newest first (lightweight; at most a few entries). */
+  /** Saved results, newest first (at most MAX_SCAN_HISTORY; each a numbers-only snapshot incl. its measurements). */
   scanHistory: ScanRecord[];
   setPrediction: (prediction: SizePrediction | null) => void;
   /** Saves the profile and records it in the history (re-saving the same scan updates its entry). */

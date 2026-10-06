@@ -40,7 +40,7 @@ clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement eng
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
 no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
-Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing).
+Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing), 16 (measurement history and comparison).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
@@ -205,6 +205,17 @@ unavailable…" (never falls back to generic). Coverage: Nike t-shirt/trousers; 
 default Generic) via a "Brand" card (`SegmentedControl` `segmented--block`). The review-page card stays generic.
 `FitProfile.brand` is saved (`normalizeFitProfile` → 'generic' for older profiles; `isSavedFrom` compares it); SizeHero
 shows a "Brand" line (`brandName` prop) and `fitLabel` override. Scan history is unchanged.
+Measurement history (Step 16): the existing `scanHistory` (same persisted store key, max `MAX_SCAN_HISTORY` 10, cleared
+by Delete Profile) now keeps a snapshot per saved result: `ScanRecord` gained optional `fitPreference`, `brand`,
+`measurements` (`SavedMeasurement[]`), written by `toScanRecord`; `normalizeScanRecord` loads older records unchanged
+(fields absent, never defaulted) and drops malformed snapshot fields. `utils/profile/compareMeasurements.ts`:
+`compareMeasurements(previous, latest)` by measurement id only, change = latest − previous (unrounded),
+`MEANINGFUL_CHANGE_CM` 0.5 (`classifyChange`, float tolerance), missing either side → `unavailable`, `comparableCount`
+0 → "No comparable measurements in these two records."; descriptive only (no health/fitness wording).
+`components/profile/MeasurementHistory` replaces the Profile page's "Previous results" list (records other than the
+saved profile): cards with View Details / Compare with Latest (native buttons, `aria-expanded`/`aria-controls`,
+contextual `aria-label`s) and inline panels; "latest" = the saved `fitProfile` measurements (none → "Save a fit profile
+to compare future measurements."). Historical sizes/brands are shown as saved, never recalculated.
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
@@ -243,6 +254,7 @@ src/
   components/sizing/  SizeRecommendationCard (shown on the review page after confirmation)
   components/results/ SizeHero, MeasurementList, results.css (Results + Profile pages)
   components/scanQuality/  ScanQualityCard (review page)
+  components/profile/ MeasurementHistory (Profile page: history cards, details, comparison)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), React wrapper (statically imported)
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
@@ -277,7 +289,8 @@ src/
                       syntheticFixture (tests only)
   utils/sizing/       size recommendation (Step 10): sizeCharts (generic charts + rules), recommendSize (engine),
                       fromConfirmed (confirmed measurements → engine); brandCharts + recommendBrandSize (Step 15)
-  utils/profile/      fit profile (Step 11): fitProfile (build, history, storage guards), format (dates, scan path)
+  utils/profile/      fit profile (Step 11): fitProfile (build, history snapshots, storage guards), format (dates, scan path),
+                      compareMeasurements (Step 16)
   utils/scanQuality/  scan quality score (Step 14): calculateScanQuality, levels, weights
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,

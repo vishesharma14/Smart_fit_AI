@@ -50,9 +50,13 @@ export function buildFitProfile(
   };
 }
 
+/**
+ * The history entry for a saved profile: a snapshot of the result as it was saved (Step 16 adds the fit preference,
+ * brand and measurements), so later chart or preference changes never alter it. Numbers and labels only.
+ */
 export function toScanRecord(profile: FitProfile): ScanRecord {
-  const { id, garment, size, fit, measuredAt, savedAt } = profile;
-  return { id, garment, size, fit, measuredAt, savedAt };
+  const { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements } = profile;
+  return { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements: measurements.map((m) => ({ ...m })) };
 }
 
 /** Adds (or replaces, for the same scan + garment) a record at the front, keeping at most MAX_SCAN_HISTORY. */
@@ -82,6 +86,37 @@ export function isScanRecord(value: unknown): value is ScanRecord {
   if (!value || typeof value !== 'object') return false;
   const r = value as Record<string, unknown>;
   return isString(r.id) && isString(r.garment) && isSize(r.size) && isString(r.fit) && isString(r.measuredAt) && isString(r.savedAt);
+}
+
+/** A complete saved measurement (as written by `savedMeasurementsFrom`). */
+export function isSavedMeasurement(value: unknown): value is SavedMeasurement {
+  if (!value || typeof value !== 'object') return false;
+  const m = value as Record<string, unknown>;
+  return (
+    isString(m.id) &&
+    isString(m.name) &&
+    typeof m.valueCm === 'number' &&
+    Number.isFinite(m.valueCm) &&
+    isString(m.status) &&
+    typeof m.confidence === 'number' &&
+    Number.isFinite(m.confidence) &&
+    typeof m.manuallyEdited === 'boolean'
+  );
+}
+
+/**
+ * A stored history record as the app uses it. The Step 16 snapshot fields are kept only when valid; a record saved
+ * before them (or with a malformed snapshot field) simply has no such field — nothing is defaulted or guessed, and the
+ * measurement snapshot is kept only when every entry is intact. Returns null for anything that is not a record.
+ */
+export function normalizeScanRecord(value: unknown): ScanRecord | null {
+  if (!isScanRecord(value)) return null;
+  const { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements } = value as ScanRecord & Record<string, unknown>;
+  const record: ScanRecord = { id, garment, size, fit, measuredAt, savedAt };
+  if (isFitPreference(fitPreference)) record.fitPreference = fitPreference;
+  if (isSizingBrandId(brand)) record.brand = brand;
+  if (Array.isArray(measurements) && measurements.every(isSavedMeasurement)) record.measurements = measurements;
+  return record;
 }
 
 /**

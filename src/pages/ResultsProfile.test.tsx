@@ -176,7 +176,7 @@ describe('ProfilePage', () => {
     expect(within(hero).getByText(/8 Mar 2026/)).toBeTruthy();
     const saved = screen.getByRole('list', { name: 'Saved measurements' });
     expect(within(saved).getByText('Chest')).toBeTruthy();
-    const previous = screen.getByRole('heading', { name: 'Previous results' }).closest('section')!;
+    const previous = screen.getByRole('heading', { name: 'Measurement History' }).closest('section')!;
     expect(within(previous).getAllByRole('listitem')).toHaveLength(1);
     expect(within(previous).getByText(/1 Mar 2026/)).toBeTruthy();
   });
