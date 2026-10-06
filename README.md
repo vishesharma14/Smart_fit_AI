@@ -124,12 +124,19 @@ measurements to compare.
 
 ## Privacy
 
+This section describes how the app currently behaves; it is not a legal privacy policy or guarantee. The in-app
+**Privacy Center** (`/privacy`, linked from the Profile page) explains the same points and lets you delete your saved
+data.
+
+- The camera (video only) is used during the body scan; its input is analysed in the browser.
 - Camera frames, photos, video and segmentation masks are processed in the browser and are **not uploaded or
   saved**. For each captured view only landmark positions and outline edge positions (numbers) are kept, in memory.
 - Your details, scan results and unsaved measurements stay in memory for the session.
 - When you choose **Save Fit Profile**, the profile (garment, size, fit, measurements and dates — numbers only) and a
   short history of saved results (the same numbers and labels per result) are stored in this browser's local storage on this device, along with display
-  preferences. You can delete the profile and its history from the Profile page. There is no backend and no account.
+  preferences. You can delete the profile and its history from the Profile page or with **Delete All Saved Data** in the Privacy
+  Center (this removes only the saved profile and history — display settings and other sites' data are untouched).
+  SizerAI does not encrypt this storage separately, and clearing the site's data in the browser also removes it. There is no backend and no account.
 - The app and the pose model are served from wherever the app is hosted; the app itself calls no third-party
   services. A Content-Security-Policy (`connect-src 'self' blob: data:` in `index.html`) restricts network
   connections to the app's own origin — this also blocks the usage-statistics logging built into the MediaPipe

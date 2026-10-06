@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ScanLine, ShieldCheck, Trash2 } from 'lucide-react';
+import { Link } from 'react-router';
 import { Button } from '../components/Button';
 import { MeasurementHistory } from '../components/profile/MeasurementHistory';
 import { MeasurementList } from '../components/results/MeasurementList';
@@ -37,8 +38,11 @@ export function ProfilePage() {
       lead="Your saved size and the measurements behind it."
       introExtra={
         <p className="result-card__note profile-privacy">
-          <ShieldCheck aria-hidden="true" size={16} /> Saved in this browser on this device only — measurements and sizes,
-          never photos or video. You can delete it at any time.
+          <ShieldCheck aria-hidden="true" size={16} />
+          <span>
+            Saved in this browser on this device only — measurements and sizes, never photos or video. You can delete it at
+            any time. More in the <Link to={PATHS.privacy}>Privacy Center</Link>.
+          </span>
         </p>
       }
     >
@@ -70,6 +74,10 @@ export function ProfilePage() {
                   <ArrowRight aria-hidden="true" size={20} />
                 </Button>
               )}
+              <Button to={PATHS.privacy} variant="secondary" size="lg">
+                <ShieldCheck aria-hidden="true" size={20} />
+                Privacy Center
+              </Button>
             </div>
           </motion.section>
         )}
@@ -142,6 +150,10 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
             View latest results
           </Button>
         )}
+        <Button to={PATHS.privacy} variant="secondary" size="lg">
+          <ShieldCheck aria-hidden="true" size={20} />
+          Privacy Center
+        </Button>
         {confirmingDelete ? (
           <div className="profile-delete" role="group" aria-label="Delete saved profile">
             <p className="result-card__text">Delete your saved profile and previous results from this device?</p>
