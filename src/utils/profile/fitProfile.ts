@@ -47,6 +47,7 @@ export function buildFitProfile(
     confirmedAt: confirmed.confirmedAt,
     savedAt: now.toISOString(),
     measurements: savedMeasurementsFrom(confirmed),
+    ...(confirmed.demo ? { demo: true as const } : {}),
   };
 }
 
@@ -55,8 +56,19 @@ export function buildFitProfile(
  * brand and measurements), so later chart or preference changes never alter it. Numbers and labels only.
  */
 export function toScanRecord(profile: FitProfile): ScanRecord {
-  const { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements } = profile;
-  return { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements: measurements.map((m) => ({ ...m })) };
+  const { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements, demo } = profile;
+  return {
+    id,
+    garment,
+    size,
+    fit,
+    measuredAt,
+    savedAt,
+    fitPreference,
+    brand,
+    measurements: measurements.map((m) => ({ ...m })),
+    ...(demo ? { demo: true as const } : {}),
+  };
 }
 
 /** Adds (or replaces, for the same scan + garment) a record at the front, keeping at most MAX_SCAN_HISTORY. */
@@ -111,11 +123,12 @@ export function isSavedMeasurement(value: unknown): value is SavedMeasurement {
  */
 export function normalizeScanRecord(value: unknown): ScanRecord | null {
   if (!isScanRecord(value)) return null;
-  const { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements } = value as ScanRecord & Record<string, unknown>;
+  const { id, garment, size, fit, measuredAt, savedAt, fitPreference, brand, measurements, demo } = value as ScanRecord & Record<string, unknown>;
   const record: ScanRecord = { id, garment, size, fit, measuredAt, savedAt };
   if (isFitPreference(fitPreference)) record.fitPreference = fitPreference;
   if (isSizingBrandId(brand)) record.brand = brand;
   if (Array.isArray(measurements) && measurements.every(isSavedMeasurement)) record.measurements = measurements;
+  if (demo === true) record.demo = true;
   return record;
 }
 
@@ -126,11 +139,13 @@ export function normalizeScanRecord(value: unknown): ScanRecord | null {
  */
 export function normalizeFitProfile(value: unknown): FitProfile | null {
   if (!isFitProfile(value)) return null;
-  const { fitPreference, brand } = value as { fitPreference?: unknown; brand?: unknown };
+  const { fitPreference, brand, demo, ...rest } = value as FitProfile & { fitPreference?: unknown; brand?: unknown; demo?: unknown };
   return {
-    ...value,
+    ...rest,
     fitPreference: isFitPreference(fitPreference) ? fitPreference : DEFAULT_FIT_PREFERENCE,
     brand: isSizingBrandId(brand) ? brand : DEFAULT_SIZING_BRAND,
+    // Demo Mode marker (Step 18): kept only when exactly `true`.
+    ...(demo === true ? { demo: true as const } : {}),
   };
 }
 

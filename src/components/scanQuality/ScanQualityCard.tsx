@@ -3,10 +3,11 @@ import { Lightbulb } from 'lucide-react';
 import type { ScanQuality } from '../../types/scanQuality';
 import { fadeUpItem } from '../../utils/motion';
 import { LEVEL_LABELS } from '../../utils/scanQuality/scanQuality';
+import { DemoBadge } from '../demo/DemoModeBanner';
 import './ScanQualityCard.css';
 
 /** Informational scan-quality summary (Step 14): score, level, the measured factors and tips for weak ones. */
-export function ScanQualityCard({ quality }: { quality: ScanQuality }) {
+export function ScanQualityCard({ quality, demo = false }: { quality: ScanQuality; /** Demo Mode sample (Step 18). */ demo?: boolean }) {
   const { score, level, factors, recommendations, cappedBecause } = quality;
   const shown = factors.filter((f) => f.score !== null);
   return (
@@ -17,6 +18,7 @@ export function ScanQualityCard({ quality }: { quality: ScanQuality }) {
             Scan Quality
           </h2>
           <p className="scan-quality__level">{LEVEL_LABELS[level]}</p>
+          {demo && <DemoBadge label="Demo sample" />}
         </div>
         <p className="scan-quality__score" aria-label={`Scan quality ${score} out of 100, ${LEVEL_LABELS[level]}`}>
           <span className="scan-quality__value">{score}</span>
@@ -54,10 +56,16 @@ export function ScanQualityCard({ quality }: { quality: ScanQuality }) {
         </div>
       )}
 
-      <p className="scan-quality__note">
-        Calculated on this device from how clearly each view was captured. It does not change your measurements or
-        your size.
-      </p>
+      {demo ? (
+        <p className="scan-quality__note">
+          Demo sample: a fixed example score, not calculated from a scan. It does not change the measurements or the size.
+        </p>
+      ) : (
+        <p className="scan-quality__note">
+          Calculated on this device from how clearly each view was captured. It does not change your measurements or
+          your size.
+        </p>
+      )}
     </motion.section>
   );
 }

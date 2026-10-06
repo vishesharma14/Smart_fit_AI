@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Check, CircleCheck, Info, PencilLine, ScanLine, 
 import { useLocation } from 'react-router';
 import { Button } from '../components/Button';
 import { FormCard } from '../components/form/FormCard';
+import { DemoBadge } from '../components/demo/DemoModeBanner';
+import '../components/demo/demo.css';
 import { ScanQualityCard } from '../components/scanQuality/ScanQualityCard';
 import { SizeRecommendationCard } from '../components/sizing/SizeRecommendationCard';
 import { FormField } from '../components/form/FormField';
@@ -52,18 +54,33 @@ export function MeasurementReviewPage() {
           Your <span className="flow-step__title-accent">measurements</span>
         </>
       }
-      lead="Calculated on this device from the joint positions and body outline captured in your scan. Check them, correct any you know, then confirm."
+      lead={
+        result?.demo
+          ? 'These start as the predefined demo sample measurements. Check them, edit any value, then confirm.'
+          : 'Calculated on this device from the joint positions and body outline captured in your scan. Check them, correct any you know, then confirm.'
+      }
       introExtra={
-        <p className="measure-review__disclaimer">
-          <Info aria-hidden="true" size={18} strokeWidth={1.75} />
-          <span>
-            Camera-based measurements are estimates. For best results, wear fitted clothing, keep your full body
-            visible, and follow the scan guidance. These are not tailor or medical measurements. Each one shows how confident the
-            scan is, and measurements the scan can’t provide are marked unavailable rather than guessed. Circumferences and
-            inseam come from your body outline and stay marked uncertain until they have been checked against tape
-            measurements.
-          </span>
-        </p>
+        <>
+          {result?.demo && (
+            <div className="demo-notice measure-review__demo">
+              <DemoBadge />
+              <p>
+                <strong>Demo sample measurements.</strong> These values are fictional demonstration data, not measured
+                from a camera. Editing works exactly as it does for a real scan.
+              </p>
+            </div>
+          )}
+          <p className="measure-review__disclaimer">
+            <Info aria-hidden="true" size={18} strokeWidth={1.75} />
+            <span>
+              Camera-based measurements are estimates. For best results, wear fitted clothing, keep your full body
+              visible, and follow the scan guidance. These are not tailor or medical measurements. Each one shows how confident the
+              scan is, and measurements the scan can’t provide are marked unavailable rather than guessed. Circumferences and
+              inseam come from your body outline and stay marked uncertain until they have been checked against tape
+              measurements.
+            </span>
+          </p>
+        </>
       }
     >
       {result ? (
@@ -83,13 +100,14 @@ export function MeasurementReviewPage() {
 }
 
 function NoResults() {
+  const demoMode = useAppStore((s) => s.demoMode);
   return (
     <FlowStepForm titleId={TITLE_ID} onSubmit={(event) => event.preventDefault()}>
       <FormCard titleId="measurements-empty" title="No scan results yet">
         <p className="measure-review__empty">
           Complete the guided 360° body scan first. Your measurements are calculated from that scan.
         </p>
-        <Button to={PATHS.scan} size="lg">
+        <Button to={demoMode ? PATHS.demoScan : PATHS.scan} size="lg">
           <ScanLine aria-hidden="true" size={20} />
           Go to body scan
         </Button>
@@ -164,7 +182,7 @@ function Review({ result, confirmed, onConfirm, recommend }: ReviewProps) {
         ))}
       </motion.div>
 
-      {result.scanQuality && <ScanQualityCard quality={result.scanQuality} />}
+      {result.scanQuality && <ScanQualityCard quality={result.scanQuality} demo={result.demo === true} />}
 
       <FormCard
         titleId="measurements-list-title"
@@ -219,7 +237,7 @@ function Review({ result, confirmed, onConfirm, recommend }: ReviewProps) {
       </AnimatePresence>
 
       <motion.div className="measure-review__actions" variants={fadeUpItem}>
-        <Button to={PATHS.scan} variant="secondary" size="lg">
+        <Button to={result.demo ? PATHS.demoScan : PATHS.scan} variant="secondary" size="lg">
           <ArrowLeft aria-hidden="true" size={20} />
           Back to Scan
         </Button>

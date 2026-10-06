@@ -14,6 +14,8 @@ import { brandName } from '../../utils/sizing/brandCharts';
 import { FIT_LABELS } from '../../utils/sizing/recommendSize';
 import { fadeUpItem } from '../../utils/motion';
 import { Button } from '../Button';
+import { DemoBadge } from '../demo/DemoModeBanner';
+import '../demo/demo.css';
 import { MeasurementList } from '../results/MeasurementList';
 import '../results/results.css';
 import './MeasurementHistory.css';
@@ -22,6 +24,8 @@ import './MeasurementHistory.css';
 export interface LatestMeasurements {
   measuredAt: string;
   measurements: SavedMeasurement[];
+  /** The latest saved result is Demo Mode sample data (Step 18). */
+  demo?: boolean;
 }
 
 interface MeasurementHistoryProps {
@@ -109,6 +113,12 @@ function HistoryItem({ record, latest }: { record: ScanRecord; latest: LatestMea
         {record.fitPreference && <span className="result-tag">{FIT_DEFINITIONS[record.fitPreference].label}</span>}
       </div>
 
+      {record.demo && (
+        <p className="demo-inline">
+          <DemoBadge label="Demo data" /> Sample data from Demo Mode, not a real scan.
+        </p>
+      )}
+
       {keyMeasurements.length > 0 && (
         <dl className="history-item__key">
           {keyMeasurements.map((m) => (
@@ -166,7 +176,7 @@ function HistoryItem({ record, latest }: { record: ScanRecord; latest: LatestMea
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <HistoryComparison previous={record.measurements} latest={latest} />
+          <HistoryComparison previous={record.measurements} latest={latest} previousIsDemo={record.demo === true} />
         </motion.div>
       )}
     </li>
@@ -189,6 +199,12 @@ function HistoryDetails({ record, garmentLabel, context }: { record: ScanRecord;
           <dt>Garment</dt>
           <dd>{garmentLabel}</dd>
         </div>
+        {record.demo && (
+          <div>
+            <dt>Source</dt>
+            <dd>Demo Mode sample data</dd>
+          </div>
+        )}
         {record.brand && (
           <div>
             <dt>Size chart</dt>
@@ -231,10 +247,28 @@ const CHANGE_TEXT: Record<MeasurementComparisonRow['change'], (row: MeasurementC
   unavailable: () => 'Comparison unavailable',
 };
 
-function HistoryComparison({ previous, latest }: { previous: SavedMeasurement[]; latest: LatestMeasurements }) {
+function HistoryComparison({
+  previous,
+  latest,
+  previousIsDemo,
+}: {
+  previous: SavedMeasurement[];
+  latest: LatestMeasurements;
+  previousIsDemo: boolean;
+}) {
   const { rows, comparableCount } = compareMeasurements(previous, latest.measurements);
   return (
     <>
+      {(previousIsDemo || latest.demo) && (
+        <p className="demo-inline">
+          <DemoBadge label="Demo data" />
+          {previousIsDemo && latest.demo
+            ? 'Both records are Demo Mode sample data.'
+            : previousIsDemo
+              ? 'This earlier record is Demo Mode sample data.'
+              : 'Your latest saved result is Demo Mode sample data.'}
+        </p>
+      )}
       <p className="result-card__text">
         Compared with your latest saved measurements (scan of {formatSavedDate(latest.measuredAt)}). Change = latest −
         previous.

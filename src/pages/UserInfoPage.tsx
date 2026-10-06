@@ -1,6 +1,8 @@
 import type { FormEvent } from 'react';
 import { Mars, ShieldCheck, Smile, Venus } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { DemoBadge } from '../components/demo/DemoModeBanner';
+import { useAppStore } from '../store/useAppStore';
 import { ChoiceCards, type ChoiceOption } from '../components/form/ChoiceCards';
 import { FormCard } from '../components/form/FormCard';
 import { FormField } from '../components/form/FormField';
@@ -43,6 +45,7 @@ const WEIGHT_UNITS: SegmentOption<WeightUnit>[] = [
 export function UserInfoPage() {
   useDocumentTitle(pageTitle('Your details'));
   const navigate = useNavigate();
+  const demoMode = useAppStore((s) => s.demoMode);
   const { draft, heightUnit, weightUnit, visibleErrors: errors, setValue, markTouched, changeHeightUnit, changeWeightUnit, submit } =
     useUserInfoForm();
 
@@ -68,13 +71,24 @@ export function UserInfoPage() {
       }
       lead="Tell us a little about yourself so SizerAI can personalize your fit recommendations."
       introExtra={
-        <div className="user-info__privacy">
-          <ShieldCheck className="user-info__privacy-icon" aria-hidden="true" size={20} strokeWidth={1.75} />
-          <p>
-            <strong>Private by design.</strong> Your details stay in this browser tab for this session. Nothing you
-            enter here is uploaded.
-          </p>
-        </div>
+        <>
+          {demoMode && (
+            <div className="demo-notice user-info__demo">
+              <DemoBadge />
+              <p>
+                <strong>Sample details for the demo.</strong> “Demo User” is fictional demonstration data — change any
+                field if you like.
+              </p>
+            </div>
+          )}
+          <div className="user-info__privacy">
+            <ShieldCheck className="user-info__privacy-icon" aria-hidden="true" size={20} strokeWidth={1.75} />
+            <p>
+              <strong>Private by design.</strong> Your details stay in this browser tab for this session. Nothing you
+              enter here is uploaded.
+            </p>
+          </div>
+        </>
       }
     >
       <FlowStepForm titleId="user-info-title" onSubmit={handleSubmit}>

@@ -61,6 +61,7 @@ export function ClothingSelectionPage() {
   useDocumentTitle(pageTitle('Clothing selection'));
   const navigate = useNavigate();
   const gender = useAppStore((s) => s.userInfo.gender);
+  const demoMode = useAppStore((s) => s.demoMode);
   const { draft, availableFits, visibleErrors: errors, selectType, selectFit, submit } = useClothingSelectionForm();
   const clothingRadioName = useId();
 
@@ -74,7 +75,8 @@ export function ClothingSelectionPage() {
       document.getElementById(FIELD_IDS[firstInvalid])?.focus();
       return;
     }
-    navigate(PATHS.scan);
+    // Demo Mode uses the sample scan instead of the camera.
+    navigate(demoMode ? PATHS.demoScan : PATHS.scan);
   };
 
   return (

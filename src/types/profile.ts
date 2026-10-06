@@ -39,6 +39,8 @@ export interface ScanRecord {
   brand?: SizingBrandId;
   /** The saved measurements (cm) the size came from (Step 16 snapshot). */
   measurements?: SavedMeasurement[];
+  /** Saved from Demo Mode sample data (Step 18), never a real scan. Absent for real results. */
+  demo?: true;
 }
 
 export interface FitProfile extends ScanRecord {

@@ -106,6 +106,20 @@ the same fit-preference logic to that brand's chart (`src/utils/sizing/brandChar
   the generic chart is never substituted.
 - A saved fit profile remembers which chart its size came from (older profiles load as Generic).
 
+## Demo Mode
+
+**Try Demo Mode** on the welcome page runs the whole journey without a camera — useful for demonstrations where a
+real scan isn't practical. It is labelled everywhere it is active (a "Demo Mode" banner with **Exit Demo Mode**).
+
+- The details step is pre-filled with a fictional "Demo User"; the scan step is replaced by a **Demo Scan** page that
+  never requests the camera.
+- The measurements are one fixed set of fictional sample values (`src/utils/demo/demoData.ts`, e.g. chest 98 cm,
+  waist 84 cm, hip 100 cm) with a fixed sample scan quality (94 / Excellent) — never random, never measured.
+- They enter the normal measurement review (editable as usual) and go through the **same sizing engine**, charts,
+  brand charts and fit preference as a real scan.
+- A demo result you save is marked **Demo profile / Demo data** on the Profile page and in the history. Demo Mode
+  itself is not saved; it ends when you exit it, choose Get Started, or open the real body scan.
+
 ## Measurement history
 
 Each result you save is also kept in a short history on the Profile page (newest first, at most 10, in this

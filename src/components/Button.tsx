@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, MouseEventHandler, ReactNode } from 'react';
 import { Link } from 'react-router';
 import './Button.css';
 
@@ -15,6 +15,8 @@ interface CommonProps {
 interface LinkButtonProps extends CommonProps {
   /** Router path. When set, the button renders as a navigation link. */
   to: string;
+  /** Runs before navigating (e.g. to reset a mode). */
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
 }
 
 interface NativeButtonProps extends CommonProps, Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'className'> {
@@ -33,7 +35,7 @@ export function Button({ children, variant = 'primary', size = 'md', className, 
 
   if (rest.to !== undefined) {
     return (
-      <Link to={rest.to} className={classes}>
+      <Link to={rest.to} className={classes} onClick={rest.onClick}>
         {children}
       </Link>
     );
