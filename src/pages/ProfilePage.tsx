@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ScanLine, ShieldCheck, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
 import { Button } from '../components/Button';
+import { DemoBadge } from '../components/demo/DemoModeBanner';
+import '../components/demo/demo.css';
 import { MeasurementHistory } from '../components/profile/MeasurementHistory';
 import { MeasurementList } from '../components/results/MeasurementList';
 import { SizeHero } from '../components/results/SizeHero';
@@ -101,7 +103,7 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
     <>
       <SizeHero
         titleId="profile-hero-title"
-        eyebrow="Saved size"
+        eyebrow={profile.demo ? 'Saved size · Demo profile' : 'Saved size'}
         garment={profile.garment}
         size={profile.size}
         fit={profile.fit}
@@ -110,9 +112,14 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
         fitPreference={profile.fitPreference}
         brandName={profile.brand !== 'generic' ? brandName(profile.brand) : null}
       >
+        {profile.demo && (
+          <p className="demo-inline">
+            <DemoBadge label="Demo profile" /> Saved from Demo Mode sample data — not a real scan.
+          </p>
+        )}
         <dl className="profile-facts">
           <div>
-            <dt>Last scan</dt>
+            <dt>{profile.demo ? 'Demo scan' : 'Last scan'}</dt>
             <dd>{formatSavedDate(profile.measuredAt)}</dd>
           </div>
           <div>
@@ -138,7 +145,7 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
         {profile.brand !== 'generic' && <p className="result-card__note">{REFERENCE_SIZING_NOTE}</p>}
       </motion.section>
 
-      <MeasurementHistory records={previous} latest={{ measuredAt: profile.measuredAt, measurements: profile.measurements }} />
+      <MeasurementHistory records={previous} latest={{ measuredAt: profile.measuredAt, measurements: profile.measurements, demo: profile.demo === true }} />
 
       <motion.div className="result-actions" variants={fadeUpItem}>
         <Button to={scanPath} size="lg">

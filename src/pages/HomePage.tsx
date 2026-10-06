@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
-import { ArrowRight, Shirt, Sparkles, UserRound } from 'lucide-react';
+import { ArrowRight, FlaskConical, Shirt, Sparkles, UserRound } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { BrandLogo } from '../components/BrandLogo';
 import { Button } from '../components/Button';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -15,6 +16,9 @@ const START_UNAVAILABLE_NOTE_ID = 'start-unavailable-note';
 export function HomePage() {
   useDocumentTitle(pageTitle());
   const hasSavedProfile = useAppStore((s) => s.fitProfile !== null);
+  const enterDemoMode = useAppStore((s) => s.enterDemoMode);
+  const exitDemoMode = useAppStore((s) => s.exitDemoMode);
+  const navigate = useNavigate();
 
   return (
     <div className="welcome">
@@ -41,9 +45,22 @@ export function HomePage() {
           <motion.div className="welcome__actions" variants={item}>
             {WELCOME_NEXT_PATH ? (
               <>
-                <Button to={WELCOME_NEXT_PATH} size="lg">
+                {/* The normal flow always starts outside Demo Mode. */}
+                <Button to={WELCOME_NEXT_PATH} size="lg" onClick={exitDemoMode}>
                   Get Started
                   <ArrowRight aria-hidden="true" size={20} />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  aria-describedby="welcome-demo-note"
+                  onClick={() => {
+                    enterDemoMode();
+                    navigate(PATHS.userInfo);
+                  }}
+                >
+                  <FlaskConical aria-hidden="true" size={20} />
+                  Try Demo Mode
                 </Button>
                 {hasSavedProfile && (
                   <Button to={PATHS.profile} variant="secondary" size="lg">
@@ -51,6 +68,9 @@ export function HomePage() {
                     My Fit Profile
                   </Button>
                 )}
+                <p id="welcome-demo-note" className="welcome__note">
+                  Demo Mode shows the full journey with fixed sample data — no camera needed.
+                </p>
               </>
             ) : (
               <>

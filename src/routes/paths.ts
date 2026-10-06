@@ -8,6 +8,7 @@ export const PATHS = {
   results: '/results',
   profile: '/profile',
   privacy: '/privacy',
+  demoScan: '/demo/scan',
 } as const;
 
 /** Where the Welcome page's Start button leads. `null` hides navigation and shows the button as unavailable. */

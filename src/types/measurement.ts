@@ -113,6 +113,8 @@ export interface ScanMeasurementResult {
   measuredAt: string;
   /** Informational quality of the scan data (Step 14); absent for results created without the scan. */
   scanQuality?: ScanQuality;
+  /** Demo Mode (Step 18): predefined sample data, not a camera scan. Absent for real scans. */
+  demo?: true;
 }
 
 /** The measurements the user reviewed and confirmed (input for size prediction in a later step). */
@@ -126,4 +128,6 @@ export interface ConfirmedMeasurements {
   measuredAt: string;
   /** ISO 8601 time the user confirmed. */
   confirmedAt: string;
+  /** Confirmed from Demo Mode sample data (Step 18). Absent for real scans. */
+  demo?: true;
 }

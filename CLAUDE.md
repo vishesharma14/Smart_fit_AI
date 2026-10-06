@@ -40,11 +40,11 @@ clothing-specific scan regions, 6 (mobile-first layout), 7 (body measurement eng
 8 (measurement review and confirmation), 9B (silhouette measurements), 9C (guided automatic 360° scan),
 9E-2 (Anny body-model shadow mode, developer view only), 9E-3A (real-person validation infrastructure, developer view only), 9E-3B (controlled real-person validation tooling;
 no real-person data collected yet), 10 (rule-based size recommendation engine), 11 (Results and Fit Profile), 12 (final polish: README, 404 page,
-Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing), 16 (measurement history and comparison), 17 (Privacy Center).
+Welcome-page profile link, wording review), 13 (personalized fit preference), 14 (scan quality score), 15 (reference brand sizing), 16 (measurement history and comparison), 17 (Privacy Center), 18 (Demo Mode).
 
 Routes: `/` Welcome → `/details` User Information (fit-flow step 1 of 4) →
 `/clothing` Clothing Selection (step 2 of 4) → `/scan` Body Scan (step 3 of 4) →
-`/measurements` Measurement Review (step 4 of 4) → `/results` Results → `/profile` Fit Profile (after the flow; no step
+`/measurements` Measurement Review (step 4 of 4) (Demo Mode: `/demo/scan` replaces `/scan`) → `/results` Results → `/profile` Fit Profile (after the flow; no step
 progress) → `/privacy` Privacy Center (from Profile). Unknown paths → `NotFoundPage` (`*` route). The Welcome page shows "My Fit Profile" once a profile is saved.
 `README.md` is the public project description (keep it technically honest when features change). `index.html` sets a
 Content-Security-Policy `connect-src 'self' blob: data:`: the page may only connect to its own origin (blocks MediaPipe's
@@ -223,6 +223,18 @@ where data lives (localStorage, not encrypted, no backend), and "Delete All Save
 (`alertdialog`, focus to Cancel / back to the button / to the status message) that calls the existing
 `deleteFitProfile` (profile + history only; display settings, in-memory session data and other storage untouched).
 Linked from the Profile actions (both states), the Profile privacy note and the scan page privacy note. Not a legal policy.
+Demo Mode (Step 18): `demoMode` in the user slice (memory only, not persisted); `enterDemoMode` (Welcome "Try Demo Mode":
+sample `DEMO_USER_INFO`, clears unsaved scan results) / `exitDemoMode` (banner "Exit Demo Mode", Results "Start Real
+Scan", Welcome "Get Started" and opening `BodyScanPage` all exit; clears the sample details and demo scan results, never
+saved data). `utils/demo/demoData.ts` is the single source of the fictional sample data: `DEMO_MEASUREMENTS_CM`,
+`DEMO_SCAN_QUALITY` (real `ScanQuality` shape, 94 Excellent), `buildDemoScanResult(garment)` = an ordinary
+`ScanMeasurementResult` for the garment's region marked `demo: true` (outline measurements `uncertain`, calibration
+'none' with a demo detail). Clothing Continue → `/demo/scan` (`DemoScanPage`, no camera) when in demo; "Use Sample Scan"
+→ the existing review/edit → `recommendSize`/brand engine unchanged. The `demo` marker flows through
+`confirmMeasurements` → `ConfirmedMeasurements.demo` → `FitProfile.demo` / `ScanRecord.demo` (optional; normalizers keep
+only `true`). Labels: global `components/demo/DemoModeBanner` (in RootLayout) + `DemoBadge`, demo notices on details /
+review, `ScanQualityCard demo`, Results hero line, "Demo profile" on Profile, "Demo data" on history cards and
+comparisons; Privacy Center notes Demo Mode never uses the camera. `Button` link variant accepts `onClick`.
 `?poseDebug` shows a developer panel (body angle, frame decision + accept/reject counts, outline quality, hold,
 coverage, saved views with angles, per-view outline scale) + skeleton, plus the live outline edges, head top / floor /
 crotch and the measurement levels (`&poseDelegate=CPU|GPU` forces the delegate). Camera framing: requests 4:3 (960×720 ideal) to keep the sensor's
@@ -263,11 +275,12 @@ src/
   components/scanQuality/  ScanQualityCard (review page)
   components/profile/ MeasurementHistory (Profile page: history cards, details, comparison)
   components/privacy/ DeleteSavedData + PrivacyCenter.css (Privacy Center page)
+  components/demo/    DemoModeBanner + DemoBadge + demo.css (Demo Mode labels)
   components/scan/mannequin/  Three.js reference mannequin: procedural geometry, shader
                       scene (renders on demand only), React wrapper (statically imported)
   layouts/            RootLayout (skip link + <main> + <Outlet />), FlowStepLayout (fit-flow steps)
   pages/              route pages (HomePage, UserInfoPage, ClothingSelectionPage, BodyScanPage,
-                      MeasurementReviewPage, ResultsPage, ProfilePage, PrivacyCenterPage, NotFoundPage)
+                      MeasurementReviewPage, ResultsPage, ProfilePage, PrivacyCenterPage, DemoScanPage, NotFoundPage)
   routes/router.tsx   route definitions (createBrowserRouter)
   routes/paths.ts     central path constants (PATHS) + WELCOME_NEXT_PATH
   store/              Zustand store (useAppStore) composed from slices/
@@ -300,6 +313,7 @@ src/
   utils/profile/      fit profile (Step 11): fitProfile (build, history snapshots, storage guards), format (dates, scan path),
                       compareMeasurements (Step 16)
   utils/scanQuality/  scan quality score (Step 14): calculateScanQuality, levels, weights
+  utils/demo/         Demo Mode sample data (Step 18): demoData (single source of truth)
   workers/            annyFit.worker.ts (Anny shadow fit off the main thread)
   utils/measurement/  measurement engine: geometry, aggregate (multi-angle + confidence), calibration,
                       definitions (per-region measurements), measureScan, fromScan (scan → engine),

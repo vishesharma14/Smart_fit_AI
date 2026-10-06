@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Bookmark, CircleCheck, PencilLine, ScanLine, UserRound } from 'lucide-react';
+import { ArrowRight, Bookmark, Camera, CircleCheck, PencilLine, ScanLine, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Button } from '../components/Button';
+import { DemoBadge } from '../components/demo/DemoModeBanner';
+import '../components/demo/demo.css';
 import { SegmentedControl } from '../components/form/SegmentedControl';
 import { MeasurementList } from '../components/results/MeasurementList';
 import { SizeHero } from '../components/results/SizeHero';
@@ -46,6 +48,7 @@ export function ResultsPage() {
   const saveFitProfile = useAppStore((s) => s.saveFitProfile);
   const brand = useAppStore((s) => s.sizingBrand);
   const setSizingBrand = useAppStore((s) => s.setSizingBrand);
+  const exitDemoMode = useAppStore((s) => s.exitDemoMode);
 
   const recommendation = useMemo(
     () => (confirmed ? recommendBrandForConfirmed(confirmed, clothingSelection, gender, brand) : null),
@@ -77,6 +80,11 @@ export function ResultsPage() {
             confidenceOf={(id) => confirmed.measurements.find((m) => m.id === id)?.confidence ?? null}
             scanQuality={scanResult?.measuredAt === confirmed.measuredAt ? (scanResult.scanQuality ?? null) : null}
             onBrandChange={setSizingBrand}
+            demo={confirmed.demo === true}
+            onStartRealScan={() => {
+              exitDemoMode();
+              navigate(PATHS.userInfo);
+            }}
             onSave={() => {
               const profile = buildFitProfile(confirmed, recommendation);
               if (profile) saveFitProfile(profile);
@@ -121,11 +129,14 @@ interface ResultProps {
   /** Quality of the scan these measurements came from (Step 14), shown as a small secondary note. */
   scanQuality: ScanQuality | null;
   onBrandChange: (brand: SizingBrandId) => void;
+  /** Result of Demo Mode sample data (Step 18): labelled, with a way to start a real scan. */
+  demo: boolean;
+  onStartRealScan: () => void;
   onSave: () => void;
   onEdit: () => void;
 }
 
-function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQuality, onBrandChange, onSave, onEdit }: ResultProps) {
+function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQuality, onBrandChange, demo, onStartRealScan, onSave, onEdit }: ResultProps) {
   const { status, size, fit, alternativeSize, basedOnUncertain, garment, reason, chartName, measurementsUsed, fitPreference } = recommendation;
   const { brand, brandName, chartAvailable } = recommendation;
   const isBrand = brand !== 'generic';
@@ -147,9 +158,14 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQu
         fitLabel={chartAvailable ? undefined : REFERENCE_CHART_UNAVAILABLE}
         brandName={isBrand ? brandName : null}
       >
+        {demo && (
+          <p className="demo-inline">
+            <DemoBadge /> Based on sample measurements — demonstration only.
+          </p>
+        )}
         {scanQuality && (
           <p className="result-hero__quality" data-level={scanQuality.level}>
-            Scan quality: {LEVEL_LABELS[scanQuality.level]} · {scanQuality.score}/100
+            Scan quality{demo ? ' (demo sample)' : ''}: {LEVEL_LABELS[scanQuality.level]} · {scanQuality.score}/100
           </p>
         )}
       </SizeHero>
@@ -246,10 +262,16 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQu
           <PencilLine aria-hidden="true" size={20} />
           Edit Measurements
         </Button>
-        <Button to={PATHS.scan} variant="secondary" size="lg">
+        <Button to={demo ? PATHS.demoScan : PATHS.scan} variant="secondary" size="lg">
           <ScanLine aria-hidden="true" size={20} />
           Scan Again
         </Button>
+        {demo && (
+          <Button variant="secondary" size="lg" onClick={onStartRealScan}>
+            <Camera aria-hidden="true" size={20} />
+            Start Real Scan
+          </Button>
+        )}
       </motion.div>
       {!recommended && (
         <p className="result-card__note">A fit profile needs a recommended size. Edit your measurements or scan again.</p>

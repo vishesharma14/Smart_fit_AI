@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router';
 import { RootLayout } from '../layouts/RootLayout';
 import { BodyScanPage } from '../pages/BodyScanPage';
 import { ClothingSelectionPage } from '../pages/ClothingSelectionPage';
+import { DemoScanPage } from '../pages/DemoScanPage';
 import { HomePage } from '../pages/HomePage';
 import { MeasurementReviewPage } from '../pages/MeasurementReviewPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: PATHS.userInfo, element: <UserInfoPage /> },
       { path: PATHS.clothing, element: <ClothingSelectionPage /> },
       { path: PATHS.scan, element: <BodyScanPage /> },
+      { path: PATHS.demoScan, element: <DemoScanPage /> },
       { path: PATHS.measurements, element: <MeasurementReviewPage /> },
       { path: PATHS.results, element: <ResultsPage /> },
       { path: PATHS.profile, element: <ProfilePage /> },

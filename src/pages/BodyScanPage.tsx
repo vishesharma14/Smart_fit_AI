@@ -68,6 +68,12 @@ const CAPTURED_MESSAGE_MS = 1000;
 
 /** Step 3 of the fit flow: guided automatic 360° body scan with on-device pose detection and segmentation. */
 export function BodyScanPage() {
+  // Demo Mode (Step 18) ends when a real camera scan is opened, so sample details never scale a real scan.
+  const demoMode = useAppStore((s) => s.demoMode);
+  const exitDemoMode = useAppStore((s) => s.exitDemoMode);
+  useEffect(() => {
+    if (demoMode) exitDemoMode();
+  }, [demoMode, exitDemoMode]);
   useDocumentTitle(pageTitle('Body scan'));
   const clothing = useAppStore((s) => s.clothingSelection);
   // Every scan frames the whole body: clothing measurements need the head and feet in view so the entered height

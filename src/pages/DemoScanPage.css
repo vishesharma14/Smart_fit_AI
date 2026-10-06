@@ -1,0 +1,87 @@
+/* Demo Scan (Step 18) */
+
+.demo-scan {
+  background:
+    radial-gradient(22rem 12rem at 0% 0%, rgb(139 92 246 / 0.14), transparent 70%),
+    radial-gradient(18rem 10rem at 100% 100%, rgb(34 211 238 / 0.08), transparent 70%),
+    var(--color-surface-glass);
+}
+
+.demo-scan__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.demo-scan__head > div {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.demo-scan__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid rgb(139 92 246 / 0.4);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgb(139 92 246 / 0.25), rgb(34 211 238 / 0.15));
+  color: var(--color-text);
+}
+
+.demo-scan__values {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.demo-scan__values div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+
+.demo-scan__values dt {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.demo-scan__values dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.demo-scan__quality {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.demo-scan__quality strong {
+  color: var(--color-text);
+}
+
+/* The longer "Use Sample Scan" label wraps below Back on the narrowest phones (shared layout unchanged). */
+.demo-scan ~ .flow-step__actions {
+  flex-wrap: wrap;
+}
+
+.demo-scan ~ .flow-step__actions .flow-step__continue {
+  flex: 1 1 12rem;
+}
+
+@media (min-width: 48rem) {
+  .demo-scan ~ .flow-step__actions .flow-step__continue {
+    flex: 0 0 auto;
+  }
+}

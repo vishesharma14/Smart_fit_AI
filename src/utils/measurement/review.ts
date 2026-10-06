@@ -110,6 +110,7 @@ export function confirmMeasurements(
     calibration: result.report.calibration,
     measuredAt: result.measuredAt,
     confirmedAt: now.toISOString(),
+    ...(result.demo ? { demo: true as const } : {}),
   };
 }
 

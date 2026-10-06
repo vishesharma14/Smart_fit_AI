@@ -76,7 +76,10 @@ export function PrivacyCenterPage() {
             Only when you choose <strong>Save Fit Profile</strong>. Depending on the saved result, SizerAI may keep:
           </p>
           <ul className="privacy-list">
-            <li>Your saved fit profile: the garment, recommended size, fit, alternative size and the size chart used.</li>
+            <li>
+              Your saved fit profile: the garment, recommended size, fit, alternative size and the size chart used, and
+              whether it was created from Demo Mode sample data.
+            </li>
             <li>Your fit preference (Slim, Regular or Relaxed) and the reference brand chart, if one was chosen.</li>
             <li>
               The confirmed measurements that had a value, in centimetres, with their status, confidence and whether you
@@ -114,6 +117,10 @@ export function PrivacyCenterPage() {
               While a scan is active, the joint positions and outline edge positions for each captured angle (numbers, not
               images) are kept in memory to calculate your measurements. They belong to the current session and are not
               saved with your profile or history; the browser frees that memory on its own schedule.
+            </li>
+            <li>
+              Demo Mode never turns on the camera: it uses a fixed set of predefined sample measurements. A demo result
+              you save is stored like any saved result and marked as demo data.
             </li>
             <li>
               Optional voice guidance uses your browser’s built-in speech. Depending on the browser, the spoken instruction
