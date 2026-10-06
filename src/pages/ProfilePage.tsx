@@ -28,6 +28,8 @@ export function ProfilePage() {
   const hasConfirmed = useAppStore((s) => s.measurements !== null);
   const heightCm = useAppStore((s) => s.userInfo.heightCm);
   const deleteFitProfile = useAppStore((s) => s.deleteFitProfile);
+  // In Demo Mode, Scan Again repeats the demo scan (as on Results) instead of ending the demo on the camera page.
+  const demoMode = useAppStore((s) => s.demoMode);
 
   return (
     <FlowStepLayout
@@ -54,7 +56,7 @@ export function ProfilePage() {
             profile={profile}
             previous={history.filter((r) => r.id !== profile.id)}
             hasConfirmed={hasConfirmed}
-            scanPath={startScanPath(heightCm, PATHS)}
+            scanPath={demoMode ? PATHS.demoScan : startScanPath(heightCm, PATHS)}
             onDelete={deleteFitProfile}
           />
         ) : (
@@ -68,11 +70,11 @@ export function ProfilePage() {
             <div className="result-actions">
               <Button to={startScanPath(heightCm, PATHS)} size="lg">
                 <ScanLine aria-hidden="true" size={20} />
-                Start a scan
+                Start New Scan
               </Button>
               {hasConfirmed && (
                 <Button to={PATHS.results} variant="secondary" size="lg">
-                  View your results
+                  View Results
                   <ArrowRight aria-hidden="true" size={20} />
                 </Button>
               )}
@@ -154,7 +156,7 @@ function SavedProfile({ profile, previous, hasConfirmed, scanPath, onDelete }: S
         </Button>
         {hasConfirmed && (
           <Button to={PATHS.results} variant="secondary" size="lg">
-            View latest results
+            View Results
           </Button>
         )}
         <Button to={PATHS.privacy} variant="secondary" size="lg">

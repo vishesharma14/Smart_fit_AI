@@ -4,8 +4,8 @@
 camera scan and turns them into a clothing size recommendation.
 
 It runs entirely in the browser: pose detection and body-outline segmentation happen on your device, and no camera
-frames are uploaded. Measurements are estimates, and the size comes from a transparent comparison with a generic size
-chart — an assistive recommendation, not a tailor's measurement.
+frames are uploaded. Measurements are estimates you can review and correct, and the size comes from a transparent comparison with a
+generic (or reference brand) size chart — an assistive recommendation, not a tailor's measurement.
 
 ## Key features
 
@@ -18,8 +18,13 @@ chart — an assistive recommendation, not a tailor's measurement.
   reason. You can correct values you know; edits are marked as yours.
 - **Size recommendation**: recommended size (S–XXL), fit (Good Fit / Slightly Tight / Slightly Loose), the
   measurements used, a neighbouring size at a boundary, and a plain-language "Why this size?".
-- **Fit profile**: save your result on this device, see your saved measurements and measurement history, scan again
-  or delete it.
+- **Fit preference**: Slim / Regular / Relaxed, applied only where the measurements allow a neighbouring size.
+- **Reference brand sizing**: compare the generic result with hand-entered Nike, Levi's and H&M reference charts.
+- **Scan quality**: an informational 0–100 score of how cleanly the scan was captured, with tips.
+- **Fit profile and Measurement History**: save results on this device, review earlier snapshots and compare them with
+  your latest measurements.
+- **Privacy Center**: what is processed and stored, and one-click deletion of the saved data.
+- **Demo Mode**: the full journey with fixed, clearly labelled sample data and no camera — for demonstrations.
 - **Responsive**: designed mobile-first (full-screen scan view on phones and tablets) and for desktop.
 
 ## Technology
@@ -118,7 +123,7 @@ real scan isn't practical. It is labelled everywhere it is active (a "Demo Mode"
 - They enter the normal measurement review (editable as usual) and go through the **same sizing engine**, charts,
   brand charts and fit preference as a real scan.
 - A demo result you save is marked **Demo profile / Demo data** on the Profile page and in the history. Demo Mode
-  itself is not saved; it ends when you exit it, choose Get Started, or open the real body scan.
+  itself is not saved; it ends when you exit it, choose Start New Scan, or open the real body scan.
 
 ## Measurement history
 
@@ -206,7 +211,8 @@ secrets are needed.
   region. Treat the result as an assistive recommendation and check the brand's own chart.
 - Only adult sizes (S–XXL); children's sizes are not supported, and inseam does not produce a length size. Tailored
   trousers and blazers offer Slim and Regular fit only.
-- The fit profile is stored only in this browser on this device.
+- The fit profile is stored only in this browser on this device. Saving a Demo Mode result replaces the saved fit
+  profile like any save (it stays labelled as demo data, and the earlier result remains in the history).
 
 ## Future improvements
 

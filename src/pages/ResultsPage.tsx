@@ -110,7 +110,7 @@ export function ResultsPage() {
               ) : (
                 <Button to={startScanPath(heightCm, PATHS)} size="lg">
                   <ScanLine aria-hidden="true" size={20} />
-                  Start a scan
+                  Start New Scan
                 </Button>
               )}
             </div>
@@ -234,7 +234,11 @@ function Result({ recommendation, saved, hasProfileForScan, confidenceOf, scanQu
               note: m.sizeForMeasurement ? `→ ${m.sizeForMeasurement}` : undefined,
             }))}
           />
-          {basedOnUncertain && (
+          {demo ? (
+            <p className="result-card__note">
+              Sample measurements from Demo Mode — demonstration only, not measured from a body scan.
+            </p>
+          ) : basedOnUncertain && (
             <p className="result-card__note">
               Estimates come from your body outline and are not yet validated against tape measurements. If you know a
               value, edit it for a more reliable size.

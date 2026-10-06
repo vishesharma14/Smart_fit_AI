@@ -31,6 +31,7 @@ export function DemoScanPage() {
   const demoMode = useAppStore((s) => s.demoMode);
   const clothing = useAppStore((s) => s.clothingSelection);
   const setScanMeasurements = useAppStore((s) => s.setScanMeasurements);
+  const enterDemoMode = useAppStore((s) => s.enterDemoMode);
   const garment = clothing?.type ?? null;
   const region = scanRegionFor(garment);
   const sample = definitionsForRegion(region.id).filter((d) => d.kind !== 'unsupported');
@@ -82,7 +83,7 @@ export function DemoScanPage() {
                     : region.label}
                 </p>
               </div>
-              <DemoBadge label="Sample data" />
+              <DemoBadge label="Sample measurements" />
             </div>
             <dl className="demo-scan__values" aria-label="Sample measurements">
               {sample.map((d) => (
@@ -105,13 +106,23 @@ export function DemoScanPage() {
             <h2 id="demo-off-title" className="result-card__title">
               <FlaskConical aria-hidden="true" size={18} /> Demo Mode is off
             </h2>
-            <p className="result-card__text">Start Demo Mode from the welcome page, or scan with your camera.</p>
+            <p className="result-card__text">
+              The demo scan uses sample measurements and only works in Demo Mode. Start Demo Mode, or begin a real scan
+              with your camera.
+            </p>
             <div className="result-actions">
-              <Button to={PATHS.home} size="lg">
-                Go to the start
+              <Button
+                size="lg"
+                onClick={() => {
+                  enterDemoMode();
+                  navigate(PATHS.userInfo);
+                }}
+              >
+                <FlaskConical aria-hidden="true" size={20} />
+                Try Demo Mode
               </Button>
-              <Button to={PATHS.scan} variant="secondary" size="lg">
-                Body scan
+              <Button to={PATHS.userInfo} variant="secondary" size="lg">
+                Start New Scan
               </Button>
             </div>
           </motion.section>

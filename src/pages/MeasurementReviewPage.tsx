@@ -109,7 +109,7 @@ function NoResults() {
         </p>
         <Button to={demoMode ? PATHS.demoScan : PATHS.scan} size="lg">
           <ScanLine aria-hidden="true" size={20} />
-          Go to body scan
+          Start New Scan
         </Button>
       </FormCard>
     </FlowStepForm>

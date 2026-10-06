@@ -33,10 +33,10 @@ function renderAt(path: string) {
 }
 
 describe('navigation', () => {
-  it('Get Started leads to the details step; no profile link without a saved profile', async () => {
+  it('Start New Scan leads to the details step; no profile link without a saved profile', async () => {
     const router = renderAt(PATHS.home);
     expect(screen.queryByRole('link', { name: /My Fit Profile/ })).toBeNull();
-    await act(async () => fireEvent.click(screen.getByRole('link', { name: /Get Started/ })));
+    await act(async () => fireEvent.click(screen.getByRole('link', { name: /Start New Scan/ })));
     expect(router.state.location.pathname).toBe(PATHS.userInfo);
   });
 

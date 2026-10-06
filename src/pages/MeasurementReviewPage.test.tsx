@@ -209,7 +209,7 @@ describe('MeasurementReviewPage', () => {
     renderReview();
     expect(screen.getByText('No scan results yet')).toBeTruthy();
     expect(screen.queryByRole('listitem')).toBeNull();
-    expect(screen.getByRole('link', { name: /Go to body scan/ }).getAttribute('href')).toBe(PATHS.scan);
+    expect(screen.getByRole('link', { name: /Start New Scan/ }).getAttribute('href')).toBe(PATHS.scan);
   });
 });
 
